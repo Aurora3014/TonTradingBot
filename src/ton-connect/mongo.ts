@@ -10,6 +10,7 @@ export interface OrderingData {
     amount: number;
     price: number; // toJetton x amount = $fromJetton
     isBuy: boolean;
+    dex: string;
 }
 
 export interface User extends Document {
@@ -37,6 +38,7 @@ export interface Pool extends Document {
     decimals: number[];
     TVL: number;
     main: number;
+    dex: string;
 }
 // MongoDB connection URI
 const uri = 'mongodb://dusanpracaex:ilovemysisterwisdom@127.0.0.1:27017/?authSource=admin';
@@ -53,7 +55,8 @@ const orderingDataSchema = new Schema<OrderingData>({
     amount: Number,
     price: Number,
     isBuy: Boolean,
-    state: String
+    state: String,
+    dex: String
 });
 
 const userSchema = new Schema<User>({
@@ -80,7 +83,8 @@ const poolSchema = new Schema<Pool>({
     volume: [mongoose.Schema.Types.BigInt],
     decimals: [Number],
     TVL: Number,
-    main: Number
+    main: Number,
+    dex: String
 });
 
 // Define Mongoose models
@@ -141,8 +145,8 @@ export async function createPool(pool: Pool): Promise<Pool> {
 }
 
 // Get a pool by caption
-export async function getPoolWithCaption(caption: string[]): Promise<Pool | null> {
-    return PoolModel.findOne({ caption });
+export async function getPoolWithCaption(caption: string[], dex: string): Promise<Pool | null> {
+    return PoolModel.findOne({ caption, dex });
 }
 
 // Get all pools

@@ -1,7 +1,6 @@
-import TonWeb from "tonweb";
 import { deleteOrderingDataFromUser, getAllUsers, getPoolWithCaption } from "../ton-connect/mongo";
 import { Address, TonClient4, WalletContractV4 } from "@ton/ton";
-import { keyPairFromSecretKey, mnemonicToPrivateKey } from "@ton/crypto";
+import { mnemonicToPrivateKey } from "@ton/crypto";
 import { fetchPrice, jetton_to_Jetton, jetton_to_Ton, ton_to_Jetton } from "./api";
 const tonClient = new TonClient4({ endpoint: 'https://mainnet-v4.tonhubapi.com' });
 import {bot} from '../bot'
@@ -25,7 +24,7 @@ export async function dealOrder(){
         if(user.orderingData)
             user.orderingData!.map(async (order) => {
                 //mainCoin refers to the coin what I have and want to exchange.
-                const pool = await getPoolWithCaption(order.jettons);
+                const pool = await getPoolWithCaption(order.jettons, order.dex);
                 const mainCoinId : number = order.isBuy ? order.mainCoin : 1 - order.mainCoin;
                 const fromJetton : string = order.jettons[mainCoinId]!;
                 const fromAddress : string = pool!.assets[mainCoinId]!.replace('jetton:','');
@@ -35,7 +34,7 @@ export async function dealOrder(){
                 //ton_to_jetton case
                 try {
                     console.log('start tx');
-                    const pricePost = await fetchPrice(10 **  pool!.decimals[1 - mainCoinId]!, pool!.assets[1- mainCoinId]!, pool!.assets[mainCoinId]!);
+                    const pricePost = await fetchPrice(10 **  pool!.decimals[1 - mainCoinId]!, pool!.assets[1- mainCoinId]!, pool!.assets[mainCoinId]!, order.dex);
                     //compare price and send tx , delete document.
 
                     if(pricePost * (order.isBuy ? 1 : -1) <= order.price * 10 ** pool!.decimals[mainCoinId]! * (order.isBuy ? 1 : -1)){
