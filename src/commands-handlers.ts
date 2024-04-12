@@ -50,7 +50,7 @@ async function handleAddNewOrder(query: CallbackQuery){
         isBuy: user?.state.isBuy!,
         price: user?.state.price!,
         state: '',
-        dex:''
+        dex:user?.mode!
     };
     //check balance
     
@@ -470,6 +470,7 @@ export async function handleWithdrawCommand(query: CallbackQuery){
     const user = await getUserByTelegramID(query.message!.chat!.id);
 
     const address = user?.walletAddress;
+    console.log(user);
     const balances: walletAsset[] = await fetchDataGet(`/accounts/${address}/assets`, 'dedust');
     const assets: Jetton[] = await fetchDataGet('/assets', user!.mode);
     let outputStr = 'Toncoin : ' + (balances[0]?.balance ? (Number(balances[0]?.balance) / 1000000000) : '0') + ' TON\n';

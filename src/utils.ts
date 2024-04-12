@@ -3,8 +3,57 @@ import { InlineKeyboardButton, Message } from 'node-telegram-bot-api';
 import { bot } from './bot';
 import { fetchPrice, Jetton } from './dedust/api';
 import axios from 'axios';
+import { Pool } from './ton-connect/mongo';
 
 export const AT_WALLET_APP_NAME = 'telegram-wallet';
+
+
+interface AssetStonFi {
+    balance: string,
+    blacklisted: true,
+    community: true,
+    contract_address: string,
+    decimals: 0,
+    default_symbol: true,
+    deprecated: true,
+    dex_price_usd: string,
+    dex_usd_price: string,
+    display_name: string,
+    image_url: string,
+    kind: string,
+    symbol: string,
+    third_party_price_usd: string,
+    third_party_usd_price: string,
+    wallet_address: string
+}
+
+interface PoolStonFi {
+    address: string,
+    apy_1d: string,
+    apy_30d: string,
+    apy_7d: string,
+    collected_token0_protocol_fee: string,
+    collected_token1_protocol_fee: string,
+    deprecated: true,
+    lp_account_address: string,
+    lp_balance: string,
+    lp_fee: string,
+    lp_price_usd: string,
+    lp_total_supply: string,
+    lp_total_supply_usd: string,
+    lp_wallet_address: string,
+    protocol_fee: string,
+    protocol_fee_address: string,
+    ref_fee: string,
+    reserve0: string,
+    reserve1: string,
+    router_address: string,
+    token0_address: string,
+    token0_balance: string,
+    token1_address: string,
+    token1_balance: string
+}
+
 
 export const pTimeoutException = Symbol();
 
@@ -47,7 +96,7 @@ export async function fetchDataGet(fetchURL: String, dex:String) {
     let initString = '';
     if(dex == 'dedust') initString = 'https://api.dedust.io/v2';
     else if (dex == 'ston') initString = 'https://api.ston.fi/v1';
-    else if (dex == '') initString = 'https://api.dedust.io/v2'
+    else initString = 'https://api.dedust.io/v2'
     try {
         const response = await axios.get(initString + fetchURL, {
             headers: {
@@ -55,6 +104,52 @@ export async function fetchDataGet(fetchURL: String, dex:String) {
             }
         });
         console.log('Fetch Success => ' + fetchURL); // Output the response data
+        if(dex == 'ston'){
+            if(fetchURL == 'assets'){
+                const assetSton: AssetStonFi[] = response.data;
+                let assets: Jetton[];
+                assetSton.map((assetStonOne, index) => {
+                    assets[index] = {
+                        type: assetStonOne.kind,
+                        address: assetStonOne.contract_address,
+                        name: assetStonOne.display_name,
+                        symbol: assetStonOne.symbol,
+                        image: assetStonOne.image_url,
+                        decimals: assetStonOne.decimals,
+                        riskScore: '0',
+                    }
+                })
+                return assets!;
+            }else if(fetchURL == 'pools'){
+                const assetSton: PoolStonFi[] = response.data;
+                let pools: Object[];
+                assetSton.filter(
+                    (singleAsset) => 
+                        singleAsset.token0_address == 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c' ||
+                        singleAsset.token1_address == "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c"
+                )
+                assetSton.map((assetStonOne, index) => {
+                    pools[index] = {
+                        caption: ['',''],
+                        address: assetStonOne.address,
+                        lt: assetStonOne.lp_total_supply,
+                        totalSupply: Number(assetStonOne.lp_total_supply),
+                        type: 'volatile',
+                        tradeFee: Number(assetStonOne.lp_fee),
+                        prices: [0,0],
+                        assets: [assetStonOne.token0_address, assetStonOne.token1_address],
+                        reserves: [Number(assetStonOne.reserve0),Number(assetStonOne.reserve1)],
+                        fees: [Number(assetStonOne.reserve0), Number(assetStonOne.reserve1)],
+                        volume: [BigInt(0),BigInt(0)],
+                        decimals: [0,0],
+                        TVL: 0,
+                        main: assetStonOne.token0_address == "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c" ? 0 : 1,
+                        dex: '',
+                    }
+                })
+                return pools!;
+            }
+        }
         return response.data;
     } catch (error) {
         console.error('Error fetching data:', error);

@@ -15,7 +15,7 @@ export interface Jetton{
     address: string,
     name: string,
     symbol: string,
-    image: string
+    image: string,
     decimals: number,
     riskScore: string,
 }
@@ -248,11 +248,8 @@ function checkHaveTrendingCoin(pool: Pool){
     ) return 1;
     else return -1;
 }
-export async function getPair() {
-    console.log("===>Loading started<===")
+export async function getDedustPair() {
     let counter = 0;
-    //delete pools table
-    await deletePoolsCollection();
     //fetch data
     const assets: Jetton[] = await fetchDataGet('/assets', 'dedust');
     const extPrice: {symbol:string, price: number}[] = await fetchDataGet('/prices', 'dedust');
@@ -301,7 +298,6 @@ export async function getPair() {
             }
         }
     }));
-    console.log("===>Loading finished<===")
     return;
 }
 

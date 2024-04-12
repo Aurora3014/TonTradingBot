@@ -3,6 +3,10 @@ import TonWeb from 'tonweb';
 import { Router, ROUTER_REVISION, ROUTER_REVISION_ADDRESS,createJettonTransferMessage } from '@ston-fi/sdk';
 import { mnemonicToWalletKey } from '@ton/crypto';
 import axios from 'axios';
+import { Pool, createPool, deletePoolsCollection } from '../ton-connect/mongo';
+import { fetchDataGet } from '../utils';
+import { Jetton } from '../dedust/api';
+import { toNano } from 'ton-core';
 
 /**
  * This example shows how to swap two jettons using the router contract
@@ -84,5 +88,73 @@ export async function swapJetton(
     console.log(result);
     
 }
-
+function checkHaveTrendingCoin(pool: Pool){
+    if ( //maintain only trending currencies
+        pool.assets[0] == 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c' //||
+        //pool.assets[0] == 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' || //jUSDT
+        //pool.assets[0] == 'jetton:EQBlqsm144Dq6SjbPI4jjZvA1hqTIP3CvHovbIfW_t-SCALE' || //SCALE
+        //pool.assets[0] == 'jetton:EQB-MPwrd1G6WKNkLz_VnV6WqBDd142KMQv-g1O-8QUA3728' //jUSDC
+    ) return 0; 
+    else if (
+        pool.assets[1] == 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c' //||
+        // pool.assets[1] == 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' || //jUSDT
+        // pool.assets[1] == 'jetton:EQBlqsm144Dq6SjbPI4jjZvA1hqTIP3CvHovbIfW_t-SCALE' || //SCALE
+        // pool.assets[1] == 'jetton:EQB-MPwrd1G6WKNkLz_VnV6WqBDd142KMQv-g1O-8QUA3728' //jUSDC
+    ) return 1;
+    else return -1;
+}
+export async function getStonPair() {
+    let counter = 0;
+    //fetch data
+    const assets: Jetton[] = await fetchDataGet('/assets', 'ston');
+    
+    const extPrice: {symbol:string, price: number}[] = await fetchDataGet('/prices', 'dedust');
+    //TON price
+    const nativePrice = extPrice.find(p => p.symbol === 'USDT')?.price || 0;
+    let pools: Pool[] = await fetchDataGet('/pools', 'ston');
+    console.log(typeof pools);
+    pools = pools.filter(pool => checkHaveTrendingCoin(pool) >= 0 && pool!.reserves![0]! > toNano(100));
+    
+    await Promise.all(pools.map(async (pool, index) => {
+        pool.caption = ['', ''];
+        pool.prices = [0, 0];
+        pool.TVL = 0;
+        pool.decimals = [0,0];
+        let flag = true;
+        for (let i = 0; i < 2; i++) {
+            try {
+                const filteredAssets = assets.filter(asset => asset.address === pool.assets[i]?.replace('jetton:', ''));
+                let decimals = 0;
+                if (filteredAssets.length !== 0 || pool.assets[i] === 'native') {
+                    if (pool.assets[i] === 'native'){ pool.caption[i] = 'TON'; decimals = 9}
+                    else { pool.caption[i] = filteredAssets[0]!.symbol; decimals = filteredAssets[0]?.decimals!} //init caption
+                    // const pricePost = await fetchPrice(10 ** decimals * 1000000,  pool.assets[i]!, 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' );
+                    
+                     pool.decimals[i] = decimals;
+                    // const price = pricePost * nativePrice / 10 ** 6 /1000000;
+                    // pool.prices[i] = Number(price < 1? price.toPrecision(9):price)  // price in USD
+                    // if(pool.assets[i] == 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA')
+                    // pool.prices[i] = nativePrice;
+                //pool.TVL += (pool.prices[i]! * pool.reserves[i]!);
+                } else {
+                    flag = false;
+                }
+            } catch (error) {
+                console.log(`Error in async operation for pool ${index}, asset ${i}:`, error);
+                counter++;
+                continue;
+            }
+        }
+        pool.main = checkHaveTrendingCoin(pool);
+        counter++;
+        if (flag) {
+            try {
+                const poolId = await createPool(pool); // 5000 milliseconds (5 seconds) timeout
+            } catch (error) {
+                console.error('Error creating pool:', error);
+            }
+        }
+    }));
+    return;
+}
 //swapJetton('', '', '', 0.01);

@@ -19,10 +19,10 @@ import {
 } from './commands-handlers';
 import { initRedisClient } from './ton-connect/storage';
 import TonWeb from 'tonweb';
-import { connect, deleteOrderingDataFromUser, getPoolWithCaption, getUserByTelegramID, updateUserMode, updateUserState } from './ton-connect/mongo';
+import { connect, deleteOrderingDataFromUser, deletePoolsCollection, getPoolWithCaption, getUserByTelegramID, updateUserMode, updateUserState } from './ton-connect/mongo';
 import { commandCallback } from './commands-handlers';
 import TelegramBot from 'node-telegram-bot-api';
-import { Jetton, getPair, sendJetton, sendTon, walletAsset } from './dedust/api';
+import { Jetton, getDedustPair, sendJetton, sendTon, walletAsset } from './dedust/api';
 import { dealOrder } from './dedust/dealOrder';
 import { fetchDataGet, getPriceStr, replyMessage } from './utils';
 import { getConnector } from './ton-connect/connector';
@@ -33,11 +33,18 @@ var sys   = require('sys'),
 
 import { Address } from '@ton/core';
 import mongoose from 'mongoose';
+import { getStonPair } from './ston-fi/api';
 const nacl = TonWeb.utils.nacl;
 let tonWeb = new TonWeb();
 
-(async() => await getPair())();
-setInterval(getPair,600000);
+const startup = async () => {
+    console.log('=====> Loading Started')
+    deletePoolsCollection();
+    await getDedustPair()
+    await getStonPair()
+}
+startup();
+setInterval(startup,600000);
 //setTimeout(() => setInterval(dealOrder,30000),10000)
 
 
@@ -173,8 +180,9 @@ async function main(): Promise<void> {
     bot.on('text',async (msg: TelegramBot.Message) => {
         
         let user = await getUserByTelegramID(msg.chat!.id);
-        let assets: Jetton[] = await fetchDataGet('/assets', user!.mode);
         if(!!!user) return;
+        let assets: Jetton[] = await fetchDataGet('/assets', user!.mode);
+
         if( user!.state.state == 'trading' ){
             user!.state.state = 'selectPair'
             if(user!.mode != '')
