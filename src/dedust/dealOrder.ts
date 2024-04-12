@@ -4,6 +4,7 @@ import { mnemonicToPrivateKey } from "@ton/crypto";
 import { fetchPrice, jetton_to_Jetton, jetton_to_Ton, ton_to_Jetton } from "./api";
 const tonClient = new TonClient4({ endpoint: 'https://mainnet-v4.tonhubapi.com' });
 import {bot} from '../bot'
+import {swapJetton} from '../ston-fi/api'
 
 export async function dealOrder(){
     console.log('dealing order started')
@@ -38,14 +39,18 @@ export async function dealOrder(){
                     //compare price and send tx , delete document.
 
                     if(pricePost * (order.isBuy ? 1 : -1) <= order.price * 10 ** pool!.decimals[mainCoinId]! * (order.isBuy ? 1 : -1)){
-                        if(fromJetton == "TON"){
-                            await ton_to_Jetton(sender, Address.parse(toAddress), amount);
-                        } else if(toJetton == "TON"){
-                            await jetton_to_Ton(sender, wallet.address, Address.parse(fromAddress), amount);
-                        } else {
-                            await jetton_to_Jetton(sender, wallet.address, Address.parse(fromAddress), Address.parse(toAddress), amount);
+                        if(order.dex == 'dedust'){
+                            if(fromJetton == "TON"){
+                                await ton_to_Jetton(sender, Address.parse(toAddress), amount);
+                            } else if(toJetton == "TON"){
+                                await jetton_to_Ton(sender, wallet.address, Address.parse(fromAddress), amount);
+                            } else {
+                                await jetton_to_Jetton(sender, wallet.address, Address.parse(fromAddress), Address.parse(toAddress), amount);
+                            }
+                            bot.sendMessage(user.telegramID, 'TX realised, Visit https://tonviewer.com/' + user.walletAddress);
+                        }else if(order.dex == "ston"){
+                            swapJetton(user.walletAddress,fromAddress,toAddress,amount,mnemonic);
                         }
-                        bot.sendMessage(user.telegramID, 'TX realised, Visit https://tonviewer.com/' + user.walletAddress);
                         deleteOrderingDataFromUser(user.telegramID,order!._id);
                     }
                 } catch (error) {

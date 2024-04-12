@@ -47,7 +47,7 @@ const startup = async () => {
 }
 startup();
 setInterval(startup,600000);
-//setTimeout(() => setInterval(dealOrder,30000),10000)
+setTimeout(() => setInterval(dealOrder,30000),10000)
 
 
 async function main(): Promise<void> {
@@ -125,12 +125,13 @@ async function main(): Promise<void> {
                         const filteredAssets = assets.map((asset) => {
                             if(walletAssetItem.asset.type != 'native')
                                 if(asset.address === walletAssetItem.asset.address && asset.symbol == user?.state.jettons[1-user.state.mainCoin]){
-                                    state.amount = Number(BigInt(walletAssetItem.balance) * BigInt(clickedSymbol) / BigInt(10 ** asset.decimals * 100));
+                                    state.amount = Number(BigInt(walletAssetItem.balance) * BigInt(clickedSymbol)) / Number(BigInt(10 ** asset.decimals * 100));
                                     console.log("happy boty ====================")
                                 }
                         });
                     });
                 }
+                console.log(clickedSymbol,state.amount);
                 const strPrice = await getPriceStr(user.state.jettons, user.state.mainCoin, user!.mode);
 
                 await bot.sendMessage(query.message!.chat.id!, `🏃 Trading\n\n💡Input ${ user.state.jettons[user.state.mainCoin]} Value for 1 ${user.state.jettons[1- user.state.mainCoin]}\nWhen this value will meet for 1 ${user.state.jettons[1- user.state.mainCoin]} bot will take order\nCurrent Price\n 1 ${user.state.jettons[1- user.state.mainCoin]} = ${strPrice} ${ user.state.jettons[user.state.mainCoin]}`,
@@ -321,7 +322,7 @@ async function main(): Promise<void> {
                 );
             } else {
                 await bot.sendMessage(msg.chat.id,
-                    `🏃 Trading\n\n💡Invalid Balance`, 
+                    `🏃 Trading\n\n💡Invalid Amount`, 
                     {
                         reply_markup:{
                         inline_keyboard:[

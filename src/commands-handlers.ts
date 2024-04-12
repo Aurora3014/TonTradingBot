@@ -127,7 +127,7 @@ async function handleTradingCallback (query: CallbackQuery, _:string){
         // keyboardArray.push([{text:'<< Back', callback_data: 'newStart'}]);
     
         await bot.editMessageText(
-            `🏃 Trading\n\n💡Please type in Jetton's Symbol/Name/address\n\nFor example:\n🔸"jUSDT" or "jusdt" or "JUSDT"\n🔸"Ton Bridge USD"\n🔸"EQBynBO23yw ... STQgGoXwiuA"`,
+            `🏃 Trading\n\n💡Please type in correct Jetton's Symbol/Name/address\n\nFor example:\n🔸"jUSDT" NOT "jusdt" or "JUSDT"\n🔸"Ton Bridge USD"\n🔸"EQBynBO23yw ... STQgGoXwiuA"`,
             {
                 message_id: query.message?.message_id,
                 chat_id: query.message?.chat.id
@@ -492,7 +492,7 @@ export async function handleWithdrawCommand(query: CallbackQuery){
     buttons.push([{text:'<< Back', callback_data: 'newStart'}]);
     bot.sendMessage(
         query.message!.chat.id,
-        `📤 Withdraw\n\n💡Please click the coin's button to withdraw\n${outputStr}`,
+        `📤 Withdraw\n\n💡Please click the coin's button to withdraw\nYou shuld have enough TON on this wallet to withdraw\n\n${outputStr}`,
         { reply_markup:{ inline_keyboard:buttons }, parse_mode:'HTML' }
     );
 }
@@ -573,7 +573,7 @@ export async function handleInstanteSwap(query: CallbackQuery): Promise<void> {
         // });
         // keyboardArray.push([{text:'<< Back', callback_data: 'newStart'}]);
         await bot.editMessageText(
-            `♻️ Instant Swap\n\n💡Please type in Jetton's Symbol/Name/address\n\nFor example:\n🔸"jUSDT" or "jusdt" or "JUSDT"\n🔸"Ton Bridge USD"\n🔸"EQBynBO23yw ... STQgGoXwiuA"`,
+            `♻️ Instant Swap\n\n💡Please type in correct Jetton's Symbol/Name/address\n\nFor example:\n🔸"jUSDT", NOT "jusdt" or "JUSDT"\n🔸"Ton Bridge USD"\n🔸"EQBynBO23yw ... STQgGoXwiuA"`,
             {
                 message_id: query.message?.message_id,
                 chat_id: query.message?.chat.id
