@@ -64,7 +64,8 @@ export async function swapJetton(
            });
     }
     // transaction to swap 1.0 JETTON0 to JETTON1 but not less than 1 nano JETTON1
-     else tonToJettonTxParams = await router.buildSwapJettonTxParams({
+     else
+      tonToJettonTxParams = await router.buildSwapJettonTxParams({
         // address of the wallet that holds TON you want to swap
         userWalletAddress: WALLET_ADDRESS,
         offerJettonAddress: JETTON0,
