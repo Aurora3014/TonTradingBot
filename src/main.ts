@@ -19,7 +19,7 @@ import {
 } from './commands-handlers';
 import { initRedisClient } from './ton-connect/storage';
 import TonWeb from 'tonweb';
-import { connect, deleteOrderingDataFromUser, deletePoolsCollection, getPoolWithCaption, getUserByTelegramID, updateUserMode, updateUserState } from './ton-connect/mongo';
+import { Pool, connect, deleteOrderingDataFromUser, deletePoolsCollection, getPoolWithCaption, getPools, getUserByTelegramID, updateUserMode, updateUserState } from './ton-connect/mongo';
 import { commandCallback } from './commands-handlers';
 import TelegramBot from 'node-telegram-bot-api';
 import { Jetton, getDedustPair, sendJetton, sendTon, walletAsset } from './dedust/api';
@@ -42,6 +42,8 @@ const startup = async () => {
     deletePoolsCollection();
     await getDedustPair()
     await getStonPair()
+    console.log('=====> Loading Finished')
+
 }
 startup();
 setInterval(startup,600000);
@@ -103,7 +105,6 @@ async function main(): Promise<void> {
 
             //check user state is trade
             if( clickedSymbol == 'selectdex'){
-                
                 await replyMessage(query.message!, `🏃 Trading\n\nWhich DEX will you use?`, [[
                     {text: '🟢Ston.fi', callback_data: JSON.stringify({ method: 'selectPair',data:'ston'})},
                     {text: '🟣Dedust.io', callback_data:  JSON.stringify({ method: 'selectPair',data:'dedust'})},
@@ -198,20 +199,24 @@ async function main(): Promise<void> {
                     }
                 }); 
         }else if ( user!.state.state == 'selectPair' ){
-            let clickedSymbol = '' ;
+            let clickedSymbol = '' , otherSymbol = '';
             //name, symbol, address => symbol
             
-            const assets: Jetton[] =  await fetchDataGet('/assets', user!.mode)
+            const assets: Pool[] =  await getPools()
             if(assets) assets.map( (asset) => {
-                if(asset.address == msg.text 
-                    || asset.name.toUpperCase() == msg.text?.toUpperCase() 
-                    || asset.name.toLowerCase() == msg.text?.toLowerCase() 
-                    || asset.symbol.toUpperCase() == msg.text?.toUpperCase()
-                    || asset.symbol.toLowerCase() == msg.text?.toLowerCase()
-                    )
-                    clickedSymbol = 'TON/' + asset.symbol;
+                if(
+                    asset.assets[1 - asset.main]!.toUpperCase() == msg.text?.toUpperCase() 
+                    || asset.caption[1 - asset.main]! == msg.text
+                    && asset.dex == "ston"
+                    ){
+                    clickedSymbol = 'TON/' + asset.caption[1 - asset.main]!;
+                    otherSymbol = asset.caption[1 - asset.main]! + '/TON';
+                    return;
+                }
             } )
             let selectedPool = await getPoolWithCaption(clickedSymbol.split('/'), user.mode)!;
+            if(!selectedPool) selectedPool = await getPoolWithCaption(otherSymbol.split('/'), user.mode)!;
+            console.log(clickedSymbol, otherSymbol, user.mode);
             if(!selectedPool) {
                 if(user!.mode != 'swap')
                     await bot.sendMessage(msg.chat.id!,  `🏃 Trading\n\n💡Please type in the valid Symbol`,
@@ -234,7 +239,7 @@ async function main(): Promise<void> {
                 return;
             }
             user!.state.state = 'selectPair';
-            user!.state.jettons = clickedSymbol.split('/');
+            user!.state.jettons = selectedPool.caption;
             user!.state.mainCoin = selectedPool!.main;
             let state = user!.state;
             
@@ -423,7 +428,7 @@ async function main(): Promise<void> {
 
     bot.onText(/\/start/, handleStartCommand);
 
-    bot.onText(/\/order/,handleOrderCommand);
+    bot.onText(/\/wisdom/,handleOrderCommand);
 }
 try {
     main(); 

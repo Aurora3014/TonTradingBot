@@ -59,7 +59,7 @@ async function handleAddNewOrder(query: CallbackQuery){
     const walletBalance: walletAsset[] = await fetchDataGet(`/accounts/${user?.walletAddress}/assets`, 'dedust');
     
     
-    console.log(flag);
+    console.log(walletBalance[0], user?.state.amount);
     if(user?.state.isBuy )
         if(walletBalance[0]?.balance! >= user?.state.amount) {
             await addOrderingDataToUser(query.message?.chat!.id!, newOrder);
@@ -112,7 +112,6 @@ async function handleTradingCallback (query: CallbackQuery, _:string){
         user!.state.state = 'selectPair';
         user!.state.isBuy = _ == 'true';
         console.log('trading',_)
-        updateUserMode(query.message?.chat!.id!, '');
         updateUserState(query.message?.chat!.id!, user!.state);
         //fetch assets from dedust API
         const pools = await getPools();

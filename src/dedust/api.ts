@@ -229,7 +229,7 @@ export async function fetchPrice(amount: number, from: string, to: string, dex: 
         const res = (await axios.post('https://api.dedust.io/v2/routing/plan', { amount, from, to },{timeout:10000})).data;
         return res[0][res[0].length - 1].amountOut ;
     }else if(dex == 'ston'){
-        const res = (await axios.post('https://api.ston.fi/v1/swap/simulate', { offer_address: from, ask_address: to, units: amount, slippage_tolerance :0.01 },{timeout:10000})).data;
+        const res = (await axios.post(`https://api.ston.fi/v1/swap/simulate?offer_address=${from}&ask_address=${to}&units=${amount}&slippage_tolerance=${0.01}`,{timeout:10000})).data;
         return Number(res['ask_units']);
     }
 } 
@@ -263,6 +263,7 @@ export async function getDedustPair() {
         pool.prices = [0, 0];
         pool.TVL = 0;
         pool.decimals = [0,0];
+        pool.dex = 'dedust'
         let flag = true;
         for (let i = 0; i < 2; i++) {
             try {
@@ -298,6 +299,7 @@ export async function getDedustPair() {
             }
         }
     }));
+    
     return;
 }
 

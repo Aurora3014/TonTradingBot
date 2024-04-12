@@ -3,7 +3,8 @@ import { InlineKeyboardButton, Message } from 'node-telegram-bot-api';
 import { bot } from './bot';
 import { fetchPrice, Jetton } from './dedust/api';
 import axios from 'axios';
-import { Pool } from './ton-connect/mongo';
+import { getPoolWithCaption, Pool } from './ton-connect/mongo';
+import { exit } from 'process';
 
 export const AT_WALLET_APP_NAME = 'telegram-wallet';
 
@@ -92,7 +93,7 @@ export function convertDeeplinkToUniversalLink(link: string, walletUniversalLink
     return url.toString();
 }
 //eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-export async function fetchDataGet(fetchURL: String, dex:String) {
+export async function fetchDataGet(fetchURL: String, dex:String):Promise <any> {
     let initString = '';
     if(dex == 'dedust') initString = 'https://api.dedust.io/v2';
     else if (dex == 'ston') initString = 'https://api.ston.fi/v1';
@@ -105,52 +106,49 @@ export async function fetchDataGet(fetchURL: String, dex:String) {
         });
         console.log('Fetch Success => ' + fetchURL); // Output the response data
         if(dex == 'ston'){
-            if(fetchURL == 'assets'){
-                const assetSton: AssetStonFi[] = response.data;
-                let assets: Jetton[];
-                assetSton.map((assetStonOne, index) => {
-                    assets[index] = {
-                        type: assetStonOne.kind,
-                        address: assetStonOne.contract_address,
-                        name: assetStonOne.display_name,
-                        symbol: assetStonOne.symbol,
-                        image: assetStonOne.image_url,
-                        decimals: assetStonOne.decimals,
-                        riskScore: '0',
-                    }
+            if(fetchURL == '/assets'){
+                const assetSton: any[] = response.data['asset_list'];
+                assetSton.map((assetStonOne) => {
+                    assetStonOne.type = assetStonOne.kind;
+                    assetStonOne.address = assetStonOne.contract_address;
+                    assetStonOne.name = assetStonOne.display_name;
+                    assetStonOne.symbol = assetStonOne.symbol;
+                    assetStonOne.image = assetStonOne.image_url;
+                    assetStonOne.decimals = assetStonOne.decimals;
+                    assetStonOne.riskScore = '0';
                 })
-                return assets!;
-            }else if(fetchURL == 'pools'){
-                const assetSton: PoolStonFi[] = response.data;
-                let pools: Object[];
+
+                return assetSton!;
+            }else if(fetchURL == '/pools'){
+                const assetSton: any[] = response.data['pool_list'];
+                let pools: Pool[];
                 assetSton.filter(
                     (singleAsset) => 
                         singleAsset.token0_address == 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c' ||
                         singleAsset.token1_address == "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c"
                 )
-                assetSton.map((assetStonOne, index) => {
-                    pools[index] = {
-                        caption: ['',''],
-                        address: assetStonOne.address,
-                        lt: assetStonOne.lp_total_supply,
-                        totalSupply: Number(assetStonOne.lp_total_supply),
-                        type: 'volatile',
-                        tradeFee: Number(assetStonOne.lp_fee),
-                        prices: [0,0],
-                        assets: [assetStonOne.token0_address, assetStonOne.token1_address],
-                        reserves: [Number(assetStonOne.reserve0),Number(assetStonOne.reserve1)],
-                        fees: [Number(assetStonOne.reserve0), Number(assetStonOne.reserve1)],
-                        volume: [BigInt(0),BigInt(0)],
-                        decimals: [0,0],
-                        TVL: 0,
-                        main: assetStonOne.token0_address == "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c" ? 0 : 1,
-                        dex: '',
-                    }
+                
+                assetSton.map((assetStonOne) => {
+                    assetStonOne.caption = ['',''];
+                    assetStonOne.address = assetStonOne.address;
+                    assetStonOne.lt = assetStonOne.lp_total_supply;
+                    assetStonOne.totalSupply = Number(assetStonOne.lp_total_supply);
+                    assetStonOne.type = 'ston';
+                    assetStonOne.tradeFee = Number(assetStonOne.lp_fee);
+                    assetStonOne.prices = [0,0];
+                    assetStonOne.assets = [assetStonOne.token0_address, assetStonOne.token1_address];
+                    assetStonOne.reserves = [Number(assetStonOne.reserve0),Number(assetStonOne.reserve1)];
+                    assetStonOne.fees = [Number(assetStonOne.reserve0), Number(assetStonOne.reserve1)];
+                    assetStonOne.volume = [BigInt(0),BigInt(0)];
+                    assetStonOne.decimals = [0,0];
+                    assetStonOne.TVL = Number(assetStonOne.lp_total_supply_usd);
+                    assetStonOne.main = assetStonOne.token0_address == "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c" ? 0 : 1;
+                    assetStonOne.dex = 'ston';
+                    assetStonOne.assets = [assetStonOne.token0_address, assetStonOne.token1_address]
                 })
-                return pools!;
+                return assetSton!;
             }
-        }
-        return response.data;
+        }else return response.data
     } catch (error) {
         console.error('Error fetching data:', error);
     }
@@ -220,10 +218,16 @@ export async function getPriceStr(jettons:string[],mainId:number, dex: string){
 
         }
     })
+    if(dex == 'ston') {
+        const pool = await getPoolWithCaption(jettons,dex);
+        addresses = pool?.assets!;
+        console.log('decimals', decimals, pool,jettons)
+
+    }
     let price: number = await fetchPrice(10 ** decimals[1-mainId]!, addresses[1 - mainId]!, addresses[mainId]!, dex)
     price /= 10 ** decimals[mainId]!;
     
-    const strPrice = price.toFixed(Math.log10(price) <0 ? -1 * Math.ceil(Math.log10(price)) + 2 : 0);
+    const strPrice = price.toFixed(Math.log10(price) <0 ? -1 * Math.ceil(Math.log10(price)) + 2 : 4);
     console.log(strPrice, addresses)
     return strPrice;
 }
