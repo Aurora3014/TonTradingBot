@@ -74,8 +74,7 @@ export async function swapJetton(
         // address of the jetton you want to receive
         askJettonAddress: JETTON1,
         
-        // minimal amount of the jetton you want to receive as a result of the swap.
-        // If the amount of the jetton you want to receive is less than minAskAmount
+        
         // the transaction will bounce
         minAskAmount: new TonWeb.utils.BN(1),
         // query id to identify your transaction in the blockchain (optional)

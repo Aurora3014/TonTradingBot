@@ -148,9 +148,7 @@ async function main(): Promise<void> {
                 )
                 console.log(query.data)
             }
-            // else{
-            //     bot.sendMessage(query.message?.chat!.id!, "Please click <b>Start trading</b> from /start message to trade", {parse_mode: 'HTML'});
-            // }
+            
             updateUserState(query.message?.chat!.id!, user!.state);
         }else if(query.data.indexOf('orderclick-' + 1)){
             let user = await getUserByTelegramID(query.message?.chat.id!);
