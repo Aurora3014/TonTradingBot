@@ -171,7 +171,7 @@ export async function buildUniversalKeyboard(
         },
         {
             text: 'Open Link',
-            url: `https://ton-connect.github.io/open-tc?connect=${encodeURIComponent(link)}`
+            url: `https://194.163.169.41/open-tc?connect=${encodeURIComponent(link)}`
         }
     ];
 
@@ -186,7 +186,7 @@ export async function buildUniversalKeyboard(
 }
 
 export async function replyMessage(msg: Message, text: string, inlineButtons?: InlineKeyboardButton[][]){
-    await bot.editMessageText( text,{
+    await bot.editMessageCaption( text,{
         message_id: msg.message_id,
         chat_id: msg.chat.id,
         parse_mode: 'HTML'

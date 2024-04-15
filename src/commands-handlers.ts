@@ -125,7 +125,7 @@ async function handleTradingCallback (query: CallbackQuery, _:string){
         // });
         // keyboardArray.push([{text:'<< Back', callback_data: 'newStart'}]);
     
-        await bot.editMessageText(
+        await bot.editMessageCaption(
             `🏃 Trading\n\n💡Please type in correct Jetton's Symbol/Name/address\n\nFor example:\n🔸"jUSDT" NOT "jusdt" or "JUSDT"\n🔸"Ton Bridge USD"\n🔸"EQBynBO23yw ... STQgGoXwiuA"`,
             {
                 message_id: query.message?.message_id,
@@ -169,7 +169,7 @@ export async function handleStartCommand (msg: TelegramBot.Message)  {
          message = 'Welcome Back! ' + msg.chat?.first_name;
          telegramWalletAddress = prevUser.walletAddress;
          //set userstate idle
-         updateUserState(userId,{
+        await updateUserState(userId,{
             _id: new mongoose.Types.ObjectId(),
             state: 'idle',
             jettons: ['',''],
@@ -214,26 +214,29 @@ export async function handleStartCommand (msg: TelegramBot.Message)  {
         //save in variable to show
         telegramWalletAddress = address.toString();
     }
-    
-    bot.sendMessage(
-        msg.chat.id,
-        `🏆<b>RewardBot</b>🏆\n
-👏Welcome to <b>RewardBot</b>.
-<b>RewardBot</b> can provide you with a good trading environment <b>Anytime</b>, <b>Anywhere</b>, <b>Anyone</b> 
+    await bot.sendPhoto(msg.chat.id,"./imgpsh_fullsize_anim.png",{
+        caption: `
+*What can Reward.tg TraderBot do for you :*
 
-`,{
-    reply_markup:{
-        inline_keyboard:[
-            [{text:'💵 My wallet', callback_data:'showMyWallet'}],
-            [{text:'♻️ Instant Swap', callback_data:'instanteSwap'},{text:'🏃 Book Order',/*web_app:{url:'https://web.ton-rocket.com/trade'}*/ callback_data:'symbol-selectdex'}],
-            [{text:'🔨 Tools and Settings', callback_data:'setting'}],
-            //[{text:'🔗 Connect Your Wallet',callback_data:'walletConnect'},{text:'✂ Disconnect Wallet', callback_data:'disConnect'}],
-            //[{text:'📤 Deposit', callback_data:'deposit'},{text:'📥 Withdraw', callback_data:'withdraw'}],
-        ]
-    },
-    parse_mode:'HTML'
-    }
-    );
+- Create multi TON wallet address
+- Do instant swap
+- Set trade order
+- Get info about all TON token
+- Get Alerts
+- And more ... 
+
+Type /start to start your *Reward.tg* bot !  `,
+        reply_markup:{
+            inline_keyboard:[
+                [{text:'💵 My wallet', callback_data:'showMyWallet'}],
+                [{text:'♻️ Instant Swap', callback_data:'instanteSwap'},{text:'🏃 Book Order',/*web_app:{url:'https://web.ton-rocket.com/trade'}*/ callback_data:'symbol-selectdex'}],
+                [{text:'🔨 Tools and Settings', callback_data:'setting'}],
+                //[{text:'🔗 Connect Your Wallet',callback_data:'walletConnect'},{text:'✂ Disconnect Wallet', callback_data:'disConnect'}],
+                //[{text:'📤 Deposit', callback_data:'deposit'},{text:'📥 Withdraw', callback_data:'withdraw'}],
+            ]
+        },
+        parse_mode:'Markdown'
+    });
 }
 
 export async function handleAddNewWallet(query: CallbackQuery): Promise<void> {
@@ -520,12 +523,12 @@ export async function handleShowMyWalletCommand(msg: TelegramBot.Message): Promi
 
     const address = user?.walletAddress;
     const balances: walletAsset[] = await fetchDataGet(`/accounts/${address}/assets`, 'dedust');
-    const assets: Jetton[] = await fetchDataGet('/assets', 'dedust');
+    const assets: Jetton[] = await fetchDataGet('/assets', 'ston');
     let outputStr = '\nToncoin : ' + (balances[0]?.balance ? (Number(balances[0]?.balance) / 1000000000) : '0') + ' TON\n\n<b>-ALT TOKEN</b>\n';
 
     balances.map((walletAssetItem) => {
     
-        const filteredAssets = assets.map((asset) => {
+        assets.map((asset) => {
             if(walletAssetItem.asset.type != 'native')
                 if(asset.address === walletAssetItem.asset.address){
                     outputStr += asset.name + ' : ' + (Number(walletAssetItem.balance) / 10 ** asset.decimals) + ' ' + asset.symbol + '\n';
@@ -571,7 +574,7 @@ export async function handleInstanteSwap(query: CallbackQuery): Promise<void> {
         //     keyboardArray[Math.floor(index / 4)]![index % 4] = {text: caption, callback_data: `symbol-${caption}`};
         // });
         // keyboardArray.push([{text:'<< Back', callback_data: 'newStart'}]);
-        await bot.editMessageText(
+        await bot.editMessageCaption(
             `♻️ Instant Swap\n\n💡Please type in correct Jetton's Symbol/Name/address\n\nFor example:\n🔸"jUSDT", NOT "jusdt" or "JUSDT"\n🔸"Ton Bridge USD"\n🔸"EQBynBO23yw ... STQgGoXwiuA"`,
             {
                 message_id: query.message?.message_id,

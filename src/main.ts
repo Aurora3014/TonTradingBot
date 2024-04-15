@@ -186,7 +186,7 @@ async function main(): Promise<void> {
 
         if( user!.state.state == 'trading' ){
             user!.state.state = 'selectPair'
-            if(user!.mode != '')
+            if(user!.mode != '' && msg.text != '\/start')
                 await bot.sendMessage(msg.chat.id!,  `♻️ Instant Swap\n\n💡Which DEX do you want?`,
                 {
                     reply_markup:{
@@ -194,7 +194,7 @@ async function main(): Promise<void> {
                             {text: 'Ston.fi', web_app:{url:`https://app.ston.fi/swap?chartVisible=false&chartInterval=1w&ft=${user!.state.jettons[user!.state.mainCoin]}&tt=${user!.state.jettons[1-user!.state.mainCoin]}&fa=1`}},
                             {text: 'Dedust.io', web_app:{url:'https://dedust.io/swap'}}
                         ],[
-                            {text:'<< Back', callback_data: 'instanteSwap'}
+                            {text:'<< Back', callback_data: 'newStart'}
                         ]] 
                     }
                 }); 
