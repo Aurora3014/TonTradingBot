@@ -33,7 +33,6 @@ async function handleSelectPair(query:CallbackQuery, _: string){
         await replyMessage(query.message!, `🏃 Trading\n\nDo you want to buy/sell?`, [[
             {text: '🟢Buy', callback_data: JSON.stringify({ method: 'tradingCallback',data:'true'})},
             {text: '🔴Sell', callback_data:  JSON.stringify({ method: 'tradingCallback',data:'false'})},
-            {text: '📕Active Orders', callback_data: 'orderingBook' }
         ],[
             {text:'<< Back', callback_data:'symbol-selectdex'}
         ]] )
