@@ -8,6 +8,7 @@ import {
     handleConnectCommand,
     handleDepositCommand,
     handleDisconnectCommand,
+    handleExclusifCommand,
     handleInstanteSwap,
     handleOrderCommand,
     handleOrderingBookCommand,
@@ -93,6 +94,9 @@ async function main(): Promise<void> {
             case 'orderingBook':
                 handleOrderingBookCommand(query);
                 return;
+            case 'exclusif':
+                handleExclusifCommand(query);
+                return;
             default:
                 break;
         }
@@ -108,7 +112,7 @@ async function main(): Promise<void> {
                 await replyMessage(query.message!, `🏃 Trading\n\nWhich DEX will you use?`, [[
                     {text: '🟢Ston.fi', callback_data: JSON.stringify({ method: 'selectPair',data:'ston'})},
                     {text: '🟣Dedust.io', callback_data:  JSON.stringify({ method: 'selectPair',data:'dedust'})},
-                    {text: '📕Active Orders', callback_data: 'orderingBook' }
+                    {text: '📕Active Orders', calnlback_data: 'orderingBook' }
                 ],[
                     {text:'<< Back', callback_data:'newStart'}
                 ]] )
@@ -432,15 +436,7 @@ async function main(): Promise<void> {
 }
 try {
     main(); 
-    const express = require('express');
-    const app = express();
-    const port = 80;
-
-    app.use(express.static('public')); // Serve files from the 'public' directory
-
-    app.listen(port, () => {
-        console.log(`Server listening at ${port}`);
-    });
+    
 } catch (error) {
     console.log(error)
 }

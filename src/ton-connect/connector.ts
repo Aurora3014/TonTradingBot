@@ -26,6 +26,7 @@ export function getConnector(
     } else {
         storedItem = {
             connector: new TonConnect({
+                
                 manifestUrl: process.env.MANIFEST_URL,
                 storage: new TonConnectStorage(chatId)
             }),

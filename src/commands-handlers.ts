@@ -230,7 +230,10 @@ Type /start to start your *Reward.tg* bot !  `,
             inline_keyboard:[
                 [{text:'💵 My wallet', callback_data:'showMyWallet'}],
                 [{text:'♻️ Instant Swap', callback_data:'instanteSwap'},{text:'🏃 Book Order',/*web_app:{url:'https://web.ton-rocket.com/trade'}*/ callback_data:'symbol-selectdex'}],
+                [{text:'🏆 Exclusif:Earn Reward from TON Token', callback_data:'exclusif'}],
+                [{text:'💡 Token Info ( soon )', callback_data:'instanap'},{text:'🚨 Alert ( soon )',/*web_app:{url:'https://web.ton-rocket.com/trade'}*/ callback_data:'sselectdex'}],
                 [{text:'🔨 Tools and Settings', callback_data:'setting'}],
+                [{text:'🥇 Premium ( soon )', callback_data:'seng'}],
                 //[{text:'🔗 Connect Your Wallet',callback_data:'walletConnect'},{text:'✂ Disconnect Wallet', callback_data:'disConnect'}],
                 //[{text:'📤 Deposit', callback_data:'deposit'},{text:'📥 Withdraw', callback_data:'withdraw'}],
             ]
@@ -262,7 +265,9 @@ export async function handleWalletSelect(query: CallbackQuery, _:string): Promis
     );
     await handleShowMyWalletCommand(query.message!)
 }
-
+export async function handleExclusifCommand(query:CallbackQuery):Promise<void>{
+    bot.sendMessage(query.message?.chat.id!,'Joins now https://reward.tg and earn each day exclusif reward from all TON token on TON chain.');
+}
 export async function handleConnectCommand(msg: TelegramBot.Message): Promise<void> {
     console.log('connect!!');
     const chatId = msg.chat.id;
