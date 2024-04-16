@@ -112,7 +112,7 @@ async function main(): Promise<void> {
                 await replyMessage(query.message!, `🏃 Trading\n\nWhich DEX will you use?`, [[
                     {text: '🟢Ston.fi', callback_data: JSON.stringify({ method: 'selectPair',data:'ston'})},
                     {text: '🟣Dedust.io', callback_data:  JSON.stringify({ method: 'selectPair',data:'dedust'})},
-                    {text: '📕Active Orders', calnlback_data: 'orderingBook' }
+                    {text: '📕Active Orders', callback_data: 'orderingBook' }
                 ],[
                     {text:'<< Back', callback_data:'newStart'}
                 ]] )
