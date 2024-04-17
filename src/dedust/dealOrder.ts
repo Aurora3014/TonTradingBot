@@ -37,7 +37,7 @@ export async function dealOrder(){
                     console.log('start tx');
                     const pricePost = await fetchPrice(10 **  pool!.decimals[1 - mainCoinId]!, pool!.assets[1- mainCoinId]!, pool!.assets[mainCoinId]!, order.dex);
                     //compare price and send tx , delete document.
-
+                    console.log(pricePost,order.price * 10 ** pool!.decimals[mainCoinId]! * (order.isBuy ? 1 : -1) )
                     if(pricePost * (order.isBuy ? 1 : -1) <= order.price * 10 ** pool!.decimals[mainCoinId]! * (order.isBuy ? 1 : -1)){
                         if(order.dex == 'dedust'){
                             if(fromJetton == "TON"){
