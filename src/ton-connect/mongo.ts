@@ -1,5 +1,6 @@
 // eslint-disable-next-line @typescript-eslint/no-redeclare
-import mongoose, { Schema, Document, Model } from 'mongoose';
+import mongoose, { Schema, Document, Model, ObjectId } from 'mongoose';
+import { Jetton } from '../dedust/api';
 
 // Define interfaces
 export interface OrderingData {
@@ -39,6 +40,15 @@ export interface Pool extends Document {
     TVL: number;
     main: number;
     dex: string;
+}
+
+export interface AltToken extends Document {
+    _id: ObjectId;
+    address: string;
+    name: string;
+    symbole: string;
+    image: string;
+    des: string;
 }
 // MongoDB connection URI
 const uri = 'mongodb://127.0.0.1:27017/';
@@ -168,5 +178,24 @@ export async function getPools(): Promise<Pool[]> {
 
 // Delete the pools collection
 export async function deletePoolsCollection(): Promise<void> {
+    await PoolModel.deleteMany({});
+}
+// Create a new pool
+export async function createAltToken(altToken: AltToken): Promise<Pool> {
+    return PoolModel.create(altToken);
+}
+
+// Get a pool by caption
+export async function getAltTokenWithAddress(address: string, dex: string): Promise<AltToken | null> {
+    return PoolModel.findOne({ address, dex });
+}
+
+// Get all pools
+export async function getAltTokens(): Promise<AltToken[]> {
+    return PoolModel.find({});
+}
+
+// Delete the pools collection
+export async function deleteAltTokensCollection(): Promise<void> {
     await PoolModel.deleteMany({});
 }

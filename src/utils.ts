@@ -3,7 +3,7 @@ import { InlineKeyboardButton, Message } from 'node-telegram-bot-api';
 import { bot } from './bot';
 import { fetchPrice, Jetton } from './dedust/api';
 import axios from 'axios';
-import { getPoolWithCaption } from './ton-connect/mongo';
+import { getAltTokenWithAddress, getPoolWithCaption, Pool } from './ton-connect/mongo';
 
 export const AT_WALLET_APP_NAME = 'telegram-wallet';
 
@@ -243,4 +243,9 @@ export async function getPriceStr(jettons: string[], mainId: number, dex: string
     const strPrice = price.toFixed(9);
     // console.log(strPrice, addresses)
     return strPrice;
+}
+export async function altTokenTableUpdate(pools: Pool[], dex: string){
+    pools.map(pool => {
+        getAltTokenWithAddress(pool.assets[0].address, dex);
+    })
 }
