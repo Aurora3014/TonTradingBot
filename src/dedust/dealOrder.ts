@@ -1,4 +1,4 @@
-import { deleteOrderingDataFromUser, getAllUsers, getPoolWithCaption } from '../ton-connect/mongo';
+import { deleteOrderingDataFromUser, getAllUsers, getAltTokenWithAddress, getPoolWithCaption } from '../ton-connect/mongo';
 import { Address, TonClient4, WalletContractV4 } from '@ton/ton';
 import { mnemonicToPrivateKey } from '@ton/crypto';
 import { fetchPrice, jetton_to_Jetton, jetton_to_Ton, ton_to_Jetton } from './api';
@@ -33,11 +33,11 @@ export async function dealOrder() {
                 const toJetton: string = order.jettons[1 - mainCoinId]!;
                 const toAddress: string = pool!.assets[1 - mainCoinId]!.replace('jetton:', '');
                 if (pool!.decimals[1 - order.mainCoin]! === 0) {
-                    let metadata = await fetchDataGet(
-                        `/jettons/${order.jettons[1 - order.mainCoin]!}/metadata`,
+                    let metadata = await getAltTokenWithAddress(
+                        order.jettons[1 - order.mainCoin]!,
                         'dedust'
                     );
-                    pool!.decimals[1 - order.mainCoin] = Number(metadata.decimals);
+                    pool!.decimals[1 - order.mainCoin] = Number(metadata!.decimals);
                 }
                 const amount = BigInt(Math.floor(10 ** pool?.decimals[mainCoinId]! * order.amount)); //unit in ton fo rton=>jetton
 

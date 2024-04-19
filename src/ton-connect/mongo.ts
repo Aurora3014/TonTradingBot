@@ -44,9 +44,10 @@ export interface Pool extends Document {
 export interface AltToken extends Document {
     address: string;
     name: string;
-    symbole: string;
+    symbol: string;
     image: string;
     dex: string;
+    decimals: number
 }
 // MongoDB connection URI
 const uri = 'mongodb://127.0.0.1:27017/';
@@ -70,9 +71,10 @@ const orderingDataSchema = new Schema<OrderingData>({
 const altTokenSchema = new Schema<AltToken>({
     address: String,
     name: String,
-    symbole: String,
+    symbol: String,
     image: String,
     dex: String,
+    decimals: Number
 })
 
 const userSchema = new Schema<User>({
@@ -200,9 +202,16 @@ export async function getAltTokenWithAddress(
     return AltTokenModel.findOne({ address, dex });
 }
 
+export async function getAltTokenWithSymbol(
+    symbol: string,
+    dex: string
+): Promise<AltToken | null> {
+    return AltTokenModel.findOne({ symbol, dex });
+}
+
 // Get all pools
-export async function getAltTokens(): Promise<AltToken[]> {
-    return AltTokenModel.find({});
+export async function getAltTokens(dex: string): Promise<AltToken[]> {
+    return AltTokenModel.find({dex});
 }
 
 // Delete the pools collection

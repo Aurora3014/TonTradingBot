@@ -20,10 +20,14 @@ import {
 } from './commands-handlers';
 import { initRedisClient } from './ton-connect/storage';
 import {
+    AltToken,
     Pool,
     connect,
     deleteOrderingDataFromUser,
     deletePoolsCollection,
+    getAltTokenWithAddress,
+    getAltTokenWithSymbol,
+    getAltTokens,
     getPoolWithCaption,
     getPools,
     getUserByTelegramID,
@@ -44,9 +48,9 @@ import { getStonPair } from './ston-fi/api';
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 const startup = async () => {
-    console.log('=====> Loading Started');
-    await altTokenTableUpdate('dedust');
-    return;
+    // console.log('=====> Loading Started');
+    //  await altTokenTableUpdate('dedust');
+    await altTokenTableUpdate('ston');
     await deletePoolsCollection();
     await getDedustPair();
     await getStonPair();
@@ -54,7 +58,7 @@ const startup = async () => {
 };
 startup();
 setInterval(startup, 600000);
-setTimeout(() => setInterval(dealOrder, 30000), 10000);
+// setTimeout(() => setInterval(dealOrder, 30000), 10000);
 
 async function main(): Promise<void> {
     await initRedisClient();
@@ -106,6 +110,7 @@ async function main(): Promise<void> {
             default:
                 break;
         }
+        console.log(query.data)
 
         //jetton click processing
         if (query.data.indexOf('symbol-') + 1) {
@@ -130,43 +135,41 @@ async function main(): Promise<void> {
                 ]);
             // eslint-disable-next-line eqeqeq
             } else if (user?.state.state == 'isBuy') {
-                let state = user.state;
+            await bot.sendMessage(query.message?.chat.id!,  `🏃 Trading\n\n💡Processing`);
+            let state = user.state;
                 user.state.state = 'price';
                 if (state.isBuy) {
                     state.amount = Number(clickedSymbol);
                 } else {
                     const address = user.walletAddress;
                     const balances: walletAsset[] = await fetchDataGet(`/accounts/${address}/assets`, 'dedust');
-                    const assets: Jetton[] = await fetchDataGet('/assets', user!.mode);
+                    // const assets: Jetton[] = await fetchDataGet('/assets', user!.mode);
                     balances.map(async walletAssetItem => {
                         if(walletAssetItem.asset.type != 'native')
                             if (user!.state.jettons[1 - user!.state.mainCoin]!.length <= 10) {
-                                assets.map(asset => {
-                                    if (
-                                        asset.address === walletAssetItem.asset.address &&
-                                        asset.symbol ===
-                                            user?.state.jettons[1 - user.state.mainCoin]
-                                    ) {
-                                        state.amount =
-                                            Number(
-                                                BigInt(walletAssetItem.balance) *
-                                                    BigInt(clickedSymbol)
-                                            ) / Number(BigInt(10 ** asset.decimals * 100));
-                                    }
-                                });
+                                const asset = await getAltTokenWithAddress(walletAssetItem.asset.address, user!.mode);
+                                
+                                if ( asset!.symbol === user?.state.jettons[1 - user.state.mainCoin] ) {
+                                    state.amount =
+                                        Number(
+                                            BigInt(walletAssetItem.balance) *
+                                                BigInt(clickedSymbol)
+                                        ) / Number(BigInt(10 ** asset!.decimals * 100));
+                                }
+                                
                             } else {
                                 if (
                                     walletAssetItem.asset.address ===
                                     user?.state.jettons[1 - user.state.mainCoin]
                                 ) {
-                                    let matadata = await fetchDataGet(
-                                        `/jettons/${walletAssetItem.asset.address}/metadata`,
+                                    let matadata = await getAltTokenWithAddress(
+                                        walletAssetItem.asset.address,
                                         'dedust'
                                     );
                                     state.amount =
                                         Number(
                                             BigInt(walletAssetItem.balance) * BigInt(clickedSymbol)
-                                        ) / Number(BigInt(10 ** matadata.decimals * 100));
+                                        ) / Number(BigInt(10 ** matadata!.decimals * 100));
                                 }
                             }
                     });
@@ -179,11 +182,11 @@ async function main(): Promise<void> {
                 );
                 let symbol;
                 if (user.state.jettons[1 - user.state.mainCoin]!.length >= 10) {
-                    let metadata = await fetchDataGet(
-                        `/jettons/${user.state.jettons[1 - user.state.mainCoin]}/metadata`,
+                    let metadata = await getAltTokenWithAddress(
+                        user.state.jettons[1 - user.state.mainCoin]!,
                         'dedust'
                     );
-                    symbol = metadata.symbol;
+                    symbol = metadata!.symbol;
                 } else symbol = user.state.jettons[1 - user.state.mainCoin];
                 await bot.sendMessage(
                     query.message!.chat.id!,
@@ -204,16 +207,98 @@ async function main(): Promise<void> {
                 [[{text:'<< Back', callback_data: 'setting'}]] 
                 )
                 console.log(query.data)
+
+            }
+            else if (clickedSymbol.indexOf('sell-') + 1){
+                let pressedBtn = clickedSymbol.replace('sell-',''),
+                typedSymbol = '',
+                otherSymbol = '';
+            //name, symbol, address => symbol
+
+            const assets: Pool[] = await getPools();
+            if (assets)
+                assets.map(asset => {
+                    if (
+                        asset.assets[1 - asset.main]!.toUpperCase() === pressedBtn.toUpperCase() ||
+                        (asset.caption[1 - asset.main]! === pressedBtn && asset.dex === 'ston')
+                    ) {
+                        typedSymbol = 'TON/' + asset.caption[1 - asset.main]!;
+                        otherSymbol = asset.caption[1 - asset.main]! + '/TON';
+                        return;
+                    }
+                });
+            let selectedPool = await getPoolWithCaption(typedSymbol.split('/'), user!.mode)!;
+            if (!selectedPool)
+                selectedPool = await getPoolWithCaption(otherSymbol.split('/'), user!.mode)!;
+            
+            console.log(typedSymbol, otherSymbol, user!.mode);
+            if (!selectedPool) {
+                if (user!.mode !== 'swap')
+                    await bot.sendMessage(
+                        query.message?.chat.id!,
+                        `🏃 Trading\n\n💡Please type in the valid Symbol`,
+                        {
+                            reply_markup: {
+                                inline_keyboard: [
+                                    [{ text: '<< Back', callback_data: 'symbol-selectdex' }]
+                                ]
+                            }
+                        }
+                    );
+                else
+                    await bot.sendMessage(
+                        query.message?.chat.id!,
+                        `♻️ Instant Swap\n\n💡Please type in the valid Symbol`,
+                        {
+                            reply_markup: {
+                                inline_keyboard:[[
+                                    {text:'<< Back', callback_data: 'instanteSwap'}
+                                ]] 
+                            }
+                        });
+                return;
+            }
+            user!.state.jettons = selectedPool.caption;
+            user!.state.mainCoin = selectedPool!.main;
+            let state = user!.state;
+            state.state = 'isBuy';
+            if (state.isBuy) {
+                await bot.sendMessage(query.message?.chat.id!,  `🏃 Trading\n\n💡Please input or click amount button of jetton in ` + state.jettons[state.mainCoin],
+                    {
+                        reply_markup:{
+                            inline_keyboard:[
+                                [ {text:'Buy 0.1 TON', callback_data: 'symbol-0.1'},{text:'Buy 0.3 TON', callback_data: 'symbol-0.3'} ],
+                                [ {text:'Buy 0.5 TON', callback_data: 'symbol-0.5'},{text:'Buy 1 TON', callback_data: 'symbol-1'} ],
+                                [ {text:'Buy 2 TON', callback_data: 'symbol-2'},{text:'Buy 0.0001 TON', callback_data: 'symbol-0.0001'} ],
+                                [ {text:'<< Back', callback_data: 'newStart'} ]
+                            ]
+                        }
+                    });
+            }
+            else {
+                await bot.sendMessage(query.message?.chat.id!,  `🏃 Trading\n\n💡Please input or click amount button of jetton what you want to sell `,
+                    {
+                        reply_markup:{
+                            inline_keyboard:[
+                                [ {text:'Sell 5%', callback_data: 'symbol-5'},{text:'Sell 10%', callback_data: 'symbol-10'} ],
+                                [ {text:'Sell 20%', callback_data: 'symbol-20'},{text:'Sell 30%', callback_data: 'symbol-30'} ],
+                                [ {text:'Sell 50%', callback_data: 'symbol-50'},{text:'Sell 100%', callback_data: 'symbol-100'} ],
+                                [ {text:'<< Back', callback_data: 'newStart'} ]
+                            ]
+                        }
+                    });
+                
+            }
             }
             
             updateUserState(query.message?.chat!.id!, user!.state);
-        }else if(query.data.indexOf('orderclick-' + 1) > 0){
+        }else if(query.data.indexOf('orderclick-') + 1 > 0){
             let user = await getUserByTelegramID(query.message?.chat.id!);
             if(user!.state.state == 'ordermanage'){
                 console.log(query.data)
                 console.log(user?.state.state)
-                deleteOrderingDataFromUser(query.message?.chat.id!,mongoose.Types.ObjectId.createFromHexString( query.data.replace('orderclick-','')))
-                handleOrderingBookCommand(query);
+                await deleteOrderingDataFromUser(query.message?.chat.id!,mongoose.Types.ObjectId.createFromHexString( query.data.replace('orderclick-','')))
+                await handleOrderingBookCommand(query);
             }
         }
         
@@ -235,9 +320,11 @@ async function main(): Promise<void> {
     
     // eslint-disable-next-line complexity
     bot.on('text', async (msg: TelegramBot.Message) => {
+        if(msg.text == '/start')
+            return;
         let user = await getUserByTelegramID(msg.chat!.id);
         if (!!!user) return;
-        let assets: Jetton[] = await fetchDataGet('/assets', user!.mode);
+        // let assets: Jetton[] = await fetchDataGet('/assets', user!.mode);
 
         if (user!.state.state === 'trading') {
             user!.state.state = 'selectPair';
@@ -338,6 +425,8 @@ async function main(): Promise<void> {
                 
             }
         }else if(user?.state.state == 'isBuy'){
+            await bot.sendMessage(msg.chat.id,  `🏃 Trading\n\n💡Processing`);
+
             let clickedSymbol = Number( msg.text);
             let state = user.state;
                 user.state.state = 'price';
@@ -346,29 +435,33 @@ async function main(): Promise<void> {
                 } else {
                     const address = user.walletAddress;
                     const balances: walletAsset[] = await fetchDataGet(`/accounts/${address}/assets`, 'dedust');
-                    const assets: Jetton[] = await fetchDataGet('/assets', user!.mode);
+                    // const assets: Jetton[] = await fetchDataGet('/assets', user!.mode);
                     balances.map(async walletAssetItem => {
                         if(walletAssetItem.asset.type != 'native')
                             if (user!.state.jettons[1 - user!.state.mainCoin]!.length <= 10) {
-                                assets.map(asset => {
-                                    if (
-                                        asset.address === walletAssetItem.asset.address &&
-                                        asset.symbol ===
-                                            user?.state.jettons[1 - user.state.mainCoin]
-                                    ) {
-                                        state.amount = clickedSymbol * 10 ** asset.decimals
-                                    }
-                                });
+                                const asset = await getAltTokenWithAddress(walletAssetItem.asset.address, user!.mode);
+                                
+                                if ( asset!.symbol === user?.state.jettons[1 - user.state.mainCoin] ) {
+                                    state.amount =
+                                        Number(
+                                            BigInt(walletAssetItem.balance) *
+                                                BigInt(clickedSymbol)
+                                        ) / Number(BigInt(10 ** asset!.decimals * 100));
+                                }
+                                
                             } else {
                                 if (
                                     walletAssetItem.asset.address ===
                                     user?.state.jettons[1 - user.state.mainCoin]
                                 ) {
-                                    let matadata = await fetchDataGet(
-                                        `/jettons/${walletAssetItem.asset.address}/metadata`,
+                                    let matadata = await getAltTokenWithAddress(
+                                        walletAssetItem.asset.address,
                                         'dedust'
                                     );
-                                    state.amount = clickedSymbol;
+                                    state.amount =
+                                        Number(
+                                            BigInt(walletAssetItem.balance) * BigInt(clickedSymbol)
+                                        ) / Number(BigInt(10 ** matadata!.decimals * 100));
                                 }
                             }
                     });
@@ -381,11 +474,11 @@ async function main(): Promise<void> {
                 );
                 let symbol;
                 if (user.state.jettons[1 - user.state.mainCoin]!.length >= 10) {
-                    let metadata = await fetchDataGet(
-                        `/jettons/${user.state.jettons[1 - user.state.mainCoin]}/metadata`,
+                    let metadata = await getAltTokenWithAddress(
+                        user.state.jettons[1 - user.state.mainCoin]!,
                         'dedust'
                     );
-                    symbol = metadata.symbol;
+                    symbol = metadata!.symbol;
                 } else symbol = user.state.jettons[1 - user.state.mainCoin];
                 await bot.sendMessage(
                     msg.chat.id!,
@@ -435,7 +528,7 @@ async function main(): Promise<void> {
         if(user?.state.state.indexOf('withAmount-') + 1){
             let withSymbol = user?.state.state.replace('withAmount-with-','');
             const withAmount = Number(msg.text);
-            let withJetton: Jetton, flag = false;
+            let withJetton: any, flag = false;
             const connector = getConnector(msg.chat.id);
             await connector.restoreConnection();
             console.log
@@ -460,15 +553,15 @@ async function main(): Promise<void> {
             if(withSymbol == "TON" && withAmount > 0 && withAmount <= Number(walletBalance[0]?.balance!)/1000000000)
                 flag = true;
             else
-            walletBalance.map((walletAssetItem) => {
-                const filteredAssets = assets.map(async (asset) => {
-                    if(walletAssetItem.asset.type != 'native')
-                        if(asset.address === walletAssetItem.asset.address && asset.symbol == withSymbol){
-                            if(Number(walletAssetItem.balance) / 10 ** asset.decimals >= withAmount && withAmount > 0)
-                            flag = true;
-                            withJetton = asset;
-                        }
-                });
+            walletBalance.map(async (walletAssetItem) => {
+                if(walletAssetItem.asset.type != 'native'){
+                let asset = await getAltTokenWithAddress(walletAssetItem.asset.address, 'dedust')
+                    if(asset!.symbol == withSymbol){
+                        if(Number(walletAssetItem.balance) / 10 ** asset!.decimals >= withAmount && withAmount > 0)
+                        flag = true;
+                        withJetton = asset!;
+                    }
+                }
             });
             if(!flag){
                 await bot.sendMessage(msg.chat.id,  `📤 Withdraw\n\n💡Please type in the available balance`,

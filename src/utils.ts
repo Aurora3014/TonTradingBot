@@ -3,7 +3,7 @@ import { InlineKeyboardButton, Message } from 'node-telegram-bot-api';
 import { bot } from './bot';
 import { fetchPrice, Jetton } from './dedust/api';
 import axios from 'axios';
-import { createAltToken, getAltTokenWithAddress, getPoolWithCaption, Pool } from './ton-connect/mongo';
+import { AltToken, createAltToken, getAltTokenWithAddress, getPoolWithCaption, Pool } from './ton-connect/mongo';
 import mongoose from 'mongoose';
 
 export const AT_WALLET_APP_NAME = 'telegram-wallet';
@@ -134,6 +134,7 @@ export async function fetchDataGet(fetchURL: String, dex: String): Promise<any> 
                             pool.caption[k] = temp[k].metadata.symbol ?? '';
                             pool.decimals[k] = temp[k].metadata.decimals ?? 9;
                         } catch (error) {
+                            
                             pool.caption[k] = temp[k].address;
                             pool.decimals[k] = 0;
                         }
@@ -216,7 +217,7 @@ export async function replyMessage(
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export async function getPriceStr(jettons: string[], mainId: number, dex: string) {
     // eslint-disable-next-line unused-imports/no-unused-vars
-    let assets: Jetton[] = await fetchDataGet('/assets', dex);
+    // let assets: Jetton[] = await fetchDataGet('/assets', dex);
     let addresses = ['', ''];
     let decimals = [0, 0]
 
@@ -226,8 +227,8 @@ export async function getPriceStr(jettons: string[], mainId: number, dex: string
     console.log('decimals', decimals, pool, jettons)
 
     if (decimals[1 - mainId] === 0) {
-        let metadata = await fetchDataGet(`/jettons/${addresses[1 - mainId]}/metadata`, 'dedust');
-        decimals[1-mainId] = Number(metadata.decimals);
+        let metadata = await getAltTokenWithAddress(addresses[1 - mainId]!, 'dedust');
+        decimals[1-mainId] = Number(metadata!.decimals);
         console.log(metadata);
     }
     if (decimals[1 - mainId] == undefined) {
@@ -254,29 +255,61 @@ export async function altTokenTableUpdate(dex: string){
             },
             timeout: 100000000
         })).data;
-        pools.forEach(async pool => {
+        for (const pool of pools) {
             for (let i = 0; i < 2; i++) {
                 if (pool.assets[i]?.type !== 'native') {
                     const altToken = await getAltTokenWithAddress(String(pool.assets[i]!.address), dex);
-                    if (!altToken) {
+                    if (!!!altToken) {
                     console.log(pool.assets[i].address);
-
+                    try {
                         let metadata = pool.assets[i].metadata;
                         if (!!!metadata) {
-                            metadata = await fetchDataGet(
-                                `/jettons/${pool.assets[i].address}/metadata`,
-                                'dedust'
-                            );
+                            metadata = ( await axios.get(
+                                `https://api.dedust.io/v2/jettons/${pool.assets[i].address}/metadata`, {
+                                    headers: {
+                                        accept: 'application/json'
+                                    },
+                                    timeout: 100000000
+                                }) ) .data;
                         }
-                        let altToken = {
-                            ...metadata,
-                            dex: 'dedust'
-                        };
-                        console.log(altToken)
-                        await createAltToken(altToken);
+                        metadata.dex = 'dedust';
+                        metadata.address = pool.assets[i].address;
+                        console.log(await createAltToken(metadata));
+ 
+                        console.log('success')
+                        } catch (error) {
+                            console.log(error)
+                        }
                     }
                 }
             }
-        });
+        };
+    } else if (dex == 'ston') {
+        try {
+            let assets: any[] = ( await axios.get('https://api.ston.fi/v1/assets', {
+                headers: {
+                    accept: 'application/json'
+                },
+                timeout: 100000000
+            })).data.asset_list;
+            console.log(assets)
+            for (const asset of assets) {
+                const altTokenDB = await getAltTokenWithAddress(asset.contract_address, dex);
+                if (!!!altTokenDB){
+                    let altToken: any = {
+                        address: asset.address,
+                        symbol: asset.symbol,
+                        name: asset.display_name,
+                        decimals: asset.decimals,
+                        image: asset.image_url,
+                        dex
+                    }
+                    console.log(await createAltToken(altToken));
+                }
+            }
+        } catch (error) {
+            console.log(error)
+        }
+        
     }
 }
