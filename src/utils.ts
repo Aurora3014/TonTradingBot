@@ -3,7 +3,8 @@ import { InlineKeyboardButton, Message } from 'node-telegram-bot-api';
 import { bot } from './bot';
 import { fetchPrice, Jetton } from './dedust/api';
 import axios from 'axios';
-import { getAltTokenWithAddress, getPoolWithCaption, Pool } from './ton-connect/mongo';
+import { createAltToken, getAltTokenWithAddress, getPoolWithCaption, Pool } from './ton-connect/mongo';
+import mongoose from 'mongoose';
 
 export const AT_WALLET_APP_NAME = 'telegram-wallet';
 
@@ -244,8 +245,30 @@ export async function getPriceStr(jettons: string[], mainId: number, dex: string
     // console.log(strPrice, addresses)
     return strPrice;
 }
-export async function altTokenTableUpdate(pools: Pool[], dex: string){
-    pools.map(pool => {
-        getAltTokenWithAddress(pool.assets[0].address, dex);
-    })
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+export async function altTokenTableUpdate(dex: string){
+    if (dex === 'dedust') {
+        let pools: any[] = await fetchDataGet('/pools', 'dedust');
+        pools.map(pool => {
+            for (let i = 0; i < 2; i++) {
+                if (pool.assets[i]?.symbol !== 'TON') {
+                    const altToken = getAltTokenWithAddress(String(pool.assets[i]!.address), dex);
+                    if (!!!altToken) {
+                        let metadata = pool.assets[i].metadata;
+                        if (!!!metadata) {
+                            metadata = fetchDataGet(
+                                `/jettons/${pool.assets[i].address}/metadata`,
+                                'dedust'
+                            );
+                        }
+                        let altToken = {
+                            ...metadata,
+                            dex: 'dedust'
+                        };
+                        createAltToken(altToken);
+                    }
+                }
+            }
+        });
+    }
 }

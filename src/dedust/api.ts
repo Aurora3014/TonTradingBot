@@ -271,7 +271,6 @@ export async function getDedustPair() {
     // eslint-disable-next-line unused-imports/no-unused-vars
     let counter = 0;
     //fetch data
-    //const assets: Jetton[] = await fetchDataGet('/assets', 'dedust');
     // eslint-disable-next-line unused-imports/no-unused-vars
     const extPrice: { symbol: string; price: number }[] = await fetchDataGet('/prices', 'dedust');
     //TON price
@@ -287,54 +286,8 @@ export async function getDedustPair() {
     await Promise.all(
         // eslint-disable-next-line prettier/prettier
         pools.map(async (pool) => {
-            // pool.caption = ['', ''];
-            // pool.prices = [0, 0];
-            // pool.TVL = 0;
-            // pool.decimals = [0, 0];
-            // pool.dex = 'dedust';
-            // let flag = true;
-            // for (let i = 0; i < 2; i++) {
-            //     try {
-            //         // const filteredAssets = assets.filter(
-            //         //     asset => asset.address === pool.assets[i]?.replace('jetton:', '')
-            //         // );
-            //         // let decimals = 0;
-            //         // if (filteredAssets.length !== 0 || pool.assets[i] === 'native') {
-            //         //     // if (pool.assets[i] === 'native') {
-            //         //     //     pool.caption[i] = 'TON';
-            //         //     //     decimals = 9;
-            //         //     // } else {
-            //         //     //     pool.caption[i] = filteredAssets[0]!.symbol;
-            //         //     //     decimals = filteredAssets[0]?.decimals!;
-            //         //     // } //init caption
-            //         //     // // const pricePost = await fetchPrice(10 ** decimals * 1000000,  pool.assets[i]!, 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' );
-
-            //         //     // pool.decimals[i] = decimals;
-            //         //     // // const price = pricePost * nativePrice / 10 ** 6 /1000000;
-            //         //     // // pool.prices[i] = Number(price < 1? price.toPrecision(9):price)  // price in USD
-            //         //     // // if(pool.assets[i] == 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA')
-            //         //     // // pool.prices[i] = nativePrice;
-            //         //     pool.TVL += pool.prices[i]! * pool.reserves[i]!;
-            //         // } else {
-            //         //     flag = false;
-            //         // }
-            //         flag = true;
-            //     } catch (error) {
-            //         console.log(`Error in async operation for pool ${index}, asset ${i}:`, error);
-            //         counter++;
-            //         continue;
-            //     }
-            // }
             pool.main = checkHaveTrendingCoin(pool);
             await createPool(pool);
-            // counter++;
-            // if (flag) {
-            //     // eslint-disable-next-line no-empty
-            //     try {
-            //     } catch (error) {
-            //         console.error('Error creating pool:', error);
-            //     }
-            // }
         })
     );
     return;

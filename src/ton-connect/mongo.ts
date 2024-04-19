@@ -1,6 +1,5 @@
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 import mongoose, { Schema, Document, Model, ObjectId } from 'mongoose';
-import { Jetton } from '../dedust/api';
 
 // Define interfaces
 export interface OrderingData {
@@ -48,7 +47,7 @@ export interface AltToken extends Document {
     name: string;
     symbole: string;
     image: string;
-    des: string;
+    dex: string;
 }
 // MongoDB connection URI
 const uri = 'mongodb://127.0.0.1:27017/';
@@ -186,7 +185,10 @@ export async function createAltToken(altToken: AltToken): Promise<Pool> {
 }
 
 // Get a pool by caption
-export async function getAltTokenWithAddress(address: string, dex: string): Promise<AltToken | null> {
+export async function getAltTokenWithAddress(
+    address: string,
+    dex: string
+): Promise<AltToken | null> {
     return PoolModel.findOne({ address, dex });
 }
 

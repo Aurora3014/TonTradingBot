@@ -33,7 +33,7 @@ import { commandCallback } from './commands-handlers';
 import TelegramBot from 'node-telegram-bot-api';
 import { Jetton, getDedustPair, sendJetton, sendTon, walletAsset } from './dedust/api';
 import { dealOrder } from './dedust/dealOrder';
-import { fetchDataGet, getPriceStr, replyMessage } from './utils';
+import { altTokenTableUpdate, fetchDataGet, getPriceStr, replyMessage } from './utils';
 import { getConnector } from './ton-connect/connector';
 import { CHAIN, toUserFriendlyAddress } from '@tonconnect/sdk';
 let exec = require('child_process').exec;
@@ -45,7 +45,9 @@ import { getStonPair } from './ston-fi/api';
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 const startup = async () => {
     console.log('=====> Loading Started');
-    deletePoolsCollection();
+    await altTokenTableUpdate('dedust');
+    return;
+    await deletePoolsCollection();
     await getDedustPair();
     await getStonPair();
     console.log('=====> Loading Finished')
