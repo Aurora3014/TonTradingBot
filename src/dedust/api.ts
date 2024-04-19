@@ -1,46 +1,48 @@
+/* eslint-disable @typescript-eslint/explicit-function-return-type */
+/* eslint-disable no-console */
 import { Factory, JettonWallet, MAINNET_FACTORY_ADDR, VaultJetton } from '@dedust/sdk';
-import { Address, TonClient4, Sender, WalletContractV3R2, WalletContractV4 } from '@ton/ton';
-import { Cell, OpenedContract, beginCell, ContractProvider, internal,  toNano } from '@ton/core';
+import { Address, TonClient4, Sender, WalletContractV4 } from '@ton/ton';
+import { OpenedContract, beginCell, internal,  toNano } from '@ton/core';
 import { Asset, PoolType, ReadinessStatus, JettonRoot } from '@dedust/sdk';
 import axios from 'axios';
 import { mnemonicToPrivateKey, mnemonicToWalletKey } from '@ton/crypto';
-import {fetchDataGet} from '../utils'
-import { Pool, createPool, deletePoolsCollection, } from '../ton-connect/mongo';
+import { fetchDataGet } from '../utils';
+import { Pool, createPool } from '../ton-connect/mongo';
 
 const tonClient = new TonClient4({ endpoint: 'https://mainnet-v4.tonhubapi.com' });
 const factory = tonClient.open(Factory.createFromAddress(MAINNET_FACTORY_ADDR));
 
-export interface Jetton{
-    type: string,
-    address: string,
-    name: string,
-    symbol: string,
-    image: string,
-    decimals: number,
-    riskScore: string,
+export interface Jetton {
+    type: string;
+    address: string;
+    name: string;
+    symbol: string;
+    image: string;
+    decimals: number;
+    riskScore: string;
 }
 
-export interface walletAsset{
-    address: string,
-    asset:{
-        type: string,
-        address: string
-    },
-    balance: bigint
+export interface walletAsset {
+    address: string;
+    asset: {
+        type: string;
+        address: string;
+    };
+    balance: bigint;
 }
 
-export interface PriceResult{
-    pool:{
-        address: string,
-        isStable: false,
-        assets: string[],
-        reserves: string[],
-    },
-    amountIn: bigint,
-    amountOut: bigint,
-    tradeFee: bigint,
-    assetIn: string,
-    assetOut: string
+export interface PriceResult {
+    pool: {
+        address: string;
+        isStable: false;
+        assets: string[];
+        reserves: string[];
+    };
+    amountIn: bigint;
+    amountOut: bigint;
+    tradeFee: bigint;
+    assetIn: string;
+    assetOut: string;
 }
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
@@ -55,10 +57,10 @@ export async function ton_to_Jetton(sender: Sender, jettonAddress: Address, amou
     if ((await pool.getReadinessStatus()) !== ReadinessStatus.READY) {
         throw new Error('Pool (TON, jetton) does not exist.');
     }
-    console.log(pool,amountIn,jettonAddress);
+    console.log(pool, amountIn, jettonAddress);
     await tonVault.sendSwap(sender, {
         poolAddress: pool.address,
-        amount: (amountIn),
+        amount: amountIn,
         gasAmount: toNano(0.25)
     });
 }
@@ -84,11 +86,11 @@ export async function jetton_to_Ton(
     const pool = tonClient.open(await factory.getPool(PoolType.VOLATILE, [jetton, TON]));
 
     if ((await pool.getReadinessStatus()) !== ReadinessStatus.READY) {
-        throw new Error("Pool (TON, SCALE) does not exist.");
+        throw new Error('Pool (TON, SCALE) does not exist.');
     }
     console.log(pool);
     const result = await jettonWallet.sendTransfer(sender, toNano(0.3), {
-        amount: (jettonAmount),
+        amount: jettonAmount,
         destination: jettonVault.address,
         responseAddress: userAddress, // return gas to user
         forwardAmount: toNano(0.25),
@@ -122,6 +124,7 @@ export async function jetton_to_Jetton(
         sender,
         toNano(0.3), // 0.6% TON
         {
+            // eslint-disable-next-line prettier/prettier
             amount: (fromAmount),
             destination: jettonVault_A.address,
             responseAddress: userAddress, // return gas to user
@@ -136,37 +139,36 @@ export async function jetton_to_Jetton(
     );
 }
 
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+export async function sendTon(mnemonics: string[], tonAmount: bigint, targetAddress: string) {
+    let keyPair = await mnemonicToPrivateKey(mnemonics);
 
-export async function sendTon(
-    mnemonics: string[],
-    tonAmount:bigint,
-    targetAddress: string
-) {
-      let keyPair = await mnemonicToPrivateKey(mnemonics);
-      
-      // Create wallet contract
-      let workchain = 0; // Usually you need a workchain 0
-      let wallet = WalletContractV4.create({ workchain, publicKey: keyPair.publicKey });
-      let contract = tonClient.open(wallet);
-      
-      // Create a transfer
-      let seqno: number = await contract.getSeqno();
-      await contract.sendTransfer({
+    // Create wallet contract
+    let workchain = 0; // Usually you need a workchain 0
+    let wallet = WalletContractV4.create({ workchain, publicKey: keyPair.publicKey });
+    let contract = tonClient.open(wallet);
+
+    // Create a transfer
+    let seqno: number = await contract.getSeqno();
+    await contract.sendTransfer({
         seqno,
         secretKey: keyPair.secretKey,
-        messages: [internal({
-          value: tonAmount,
-          to: targetAddress,
-          body: '',
-        })]
-      });
+        messages: [
+            internal({
+                value: tonAmount,
+                to: targetAddress,
+                body: ''
+            })
+        ]
+    });
 }
 
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export async function sendJetton(
-    mnemonic:string,
-    senderAddress:Address,
-    jettonAddress:Address,
-    amount:bigint,
+    mnemonic: string,
+    senderAddress: Address,
+    jettonAddress: Address,
+    amount: bigint,
     targetAddress: Address
 ) {
     const keyPair = await mnemonicToWalletKey(mnemonic.split(','));
@@ -182,9 +184,7 @@ export async function sendJetton(
     const jettonRoot = tonClient.open(JettonRoot.createFromAddress(jettonAddress));
     let jettonWallet: OpenedContract<JettonWallet>;
     jettonWallet = tonClient.open(await jettonRoot.getWallet(senderAddress));
-    // Create wallet contract
-    
-    
+
     const forwardPayload = beginCell()
         .storeUint(0, 32) // 0 opcode means we have a comment
         .storeStringTail('Hello, TON!')
@@ -202,104 +202,140 @@ export async function sendJetton(
         .storeRef(forwardPayload)
         .endCell();
 
-   
     const provider = tonClient.provider(jettonWallet.address);
-    provider.internal(sender,{
+    provider.internal(sender, {
         value: toNano(0.1),
-        bounce:true,
+        bounce: true,
         body: messageBody
-    })
-    
+    });
 }
 
+export async function fetchPrice(amount: number, from: string, to: string, dex: string) : Promise<any> {
+    try{
+        //////TODO: get price when using ston.fi
+        if (from === to) return amount;
 
-
-export async function fetchPrice(amount: number, from: string, to: string, dex: string){ //////TODO: get price when using ston.fi
-    if(from == to) return amount;
-
-    if(dex == 'dedust'){
-        //console.log(from,to)
-        //console.log({ amount, from, to });
-        if(from != 'native')
-        if(from.indexOf('jetton:') + 1)
-            from = 'jetton:' + Address.parse(from.replace('jetton:','')).toRawString();
-        if(to != 'native')
-        if(to.indexOf('jetton:') + 1)
-            to = 'jetton:' + Address.parse(to.replace('jetton:','')).toRawString();
-        const res = (await axios.post('https://api.dedust.io/v2/routing/plan', { amount, from, to },{timeout:10000})).data;
-        return res[0][res[0].length - 1].amountOut ;
-    }else if(dex == 'ston'){
-        const res = (await axios.post(`https://api.ston.fi/v1/swap/simulate?offer_address=${from}&ask_address=${to}&units=${amount}&slippage_tolerance=${0.01}`,{timeout:10000})).data;
-        return Number(res['ask_units']);
+        if (dex === 'dedust') {
+            //console.log(from,to)
+            //console.log({ amount, from, to });
+            if (from !== 'native')
+                from = 'jetton:' + Address.parse(from.replace('jetton:', '')).toRawString();
+            if (to !== 'native')
+                to = 'jetton:' + Address.parse(to.replace('jetton:', '')).toRawString();
+            const fetchPrice = await axios.post(
+                'https://api.dedust.io/v2/routing/plan',
+                { amount, from, to },
+                { timeout: 10000 }
+            );
+            console.log("===> fetch <==== \n",  amount, from, to, dex);
+            const res = fetchPrice.data;
+            return res[0][res[0].length - 1].amountOut ;
+        } else if (dex === 'ston') {
+            const res = (
+                await axios.post(
+                    `https://api.ston.fi/v1/swap/simulate?offer_address=${from}&ask_address=${to}&units=${amount}&slippage_tolerance=${0.01}`,
+                    { timeout: 10000 }
+                )
+            ).data;
+            return Number(res['ask_units']);
+        }
+    } catch (error) {
+        console.log(error);
+        console.log('retry getPrice');
+        return await fetchPrice(amount, from, to, dex);
     }
-} 
-function checkHaveTrendingCoin(pool: Pool){
-    if ( //maintain only trending currencies
-        pool.assets[0] == 'native' //||
+}
+
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+function checkHaveTrendingCoin(pool: Pool) {
+    if (
+        //maintain only trending currencies
+        pool.assets[0] === 'native' //||
         //pool.assets[0] == 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' || //jUSDT
         //pool.assets[0] == 'jetton:EQBlqsm144Dq6SjbPI4jjZvA1hqTIP3CvHovbIfW_t-SCALE' || //SCALE
         //pool.assets[0] == 'jetton:EQB-MPwrd1G6WKNkLz_VnV6WqBDd142KMQv-g1O-8QUA3728' //jUSDC
-    ) return 0; 
+    )
+        return 0;
     else if (
-        pool.assets[1] == 'native' //||
+        pool.assets[1] === 'native' //||
         // pool.assets[1] == 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' || //jUSDT
         // pool.assets[1] == 'jetton:EQBlqsm144Dq6SjbPI4jjZvA1hqTIP3CvHovbIfW_t-SCALE' || //SCALE
         // pool.assets[1] == 'jetton:EQB-MPwrd1G6WKNkLz_VnV6WqBDd142KMQv-g1O-8QUA3728' //jUSDC
-    ) return 1;
+    )
+        return 1;
     else return -1;
 }
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export async function getDedustPair() {
+    // eslint-disable-next-line unused-imports/no-unused-vars
     let counter = 0;
     //fetch data
-    const assets: Jetton[] = await fetchDataGet('/assets', 'dedust');
-    const extPrice: {symbol:string, price: number}[] = await fetchDataGet('/prices', 'dedust');
+    //const assets: Jetton[] = await fetchDataGet('/assets', 'dedust');
+    // eslint-disable-next-line unused-imports/no-unused-vars
+    const extPrice: { symbol: string; price: number }[] = await fetchDataGet('/prices', 'dedust');
     //TON price
-    const nativePrice = extPrice.find(p => p.symbol === 'USDT')?.price || 0;
-    let pools: Pool[] = await fetchDataGet('/pools-lite', 'dedust');
-    pools = pools.filter(pool => checkHaveTrendingCoin(pool) >= 0 && pool!.reserves![0]! > toNano(100));
-    
-    await Promise.all(pools.map(async (pool, index) => {
-        pool.caption = ['', ''];
-        pool.prices = [0, 0];
-        pool.TVL = 0;
-        pool.decimals = [0,0];
-        pool.dex = 'dedust'
-        let flag = true;
-        for (let i = 0; i < 2; i++) {
-            try {
-                const filteredAssets = assets.filter(asset => asset.address === pool.assets[i]?.replace('jetton:', ''));
-                let decimals = 0;
-                if (filteredAssets.length !== 0 || pool.assets[i] === 'native') {
-                    if (pool.assets[i] === 'native'){ pool.caption[i] = 'TON'; decimals = 9}
-                    else { pool.caption[i] = filteredAssets[0]!.symbol; decimals = filteredAssets[0]?.decimals!} //init caption
-                    // const pricePost = await fetchPrice(10 ** decimals * 1000000,  pool.assets[i]!, 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' );
-                    
-                     pool.decimals[i] = decimals;
-                    // const price = pricePost * nativePrice / 10 ** 6 /1000000;
-                    // pool.prices[i] = Number(price < 1? price.toPrecision(9):price)  // price in USD
-                    // if(pool.assets[i] == 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA')
-                    // pool.prices[i] = nativePrice;
-                pool.TVL += (pool.prices[i]! * pool.reserves[i]!);
-                } else {
-                    flag = false;
-                }
-            } catch (error) {
-                console.log(`Error in async operation for pool ${index}, asset ${i}:`, error);
-                counter++;
-                continue;
-            }
-        }
-        pool.main = checkHaveTrendingCoin(pool);
-        counter++;
-        if (flag) {
-            try {
-                const poolId = await createPool(pool); // 5000 milliseconds (5 seconds) timeout
-            } catch (error) {
-                console.error('Error creating pool:', error);
-            }
-        }
-    }));
-    
+    let pools: Pool[] = await fetchDataGet('/pools', 'dedust');
+    let limit = 100;
+    pools = pools.filter(
+        pool =>
+            checkHaveTrendingCoin(pool) >= 0 &&
+            pool.reserves[0]! > limit &&
+            pool.reserves[1]! > limit
+    );
+
+    await Promise.all(
+        // eslint-disable-next-line prettier/prettier
+        pools.map(async (pool) => {
+            // pool.caption = ['', ''];
+            // pool.prices = [0, 0];
+            // pool.TVL = 0;
+            // pool.decimals = [0, 0];
+            // pool.dex = 'dedust';
+            // let flag = true;
+            // for (let i = 0; i < 2; i++) {
+            //     try {
+            //         // const filteredAssets = assets.filter(
+            //         //     asset => asset.address === pool.assets[i]?.replace('jetton:', '')
+            //         // );
+            //         // let decimals = 0;
+            //         // if (filteredAssets.length !== 0 || pool.assets[i] === 'native') {
+            //         //     // if (pool.assets[i] === 'native') {
+            //         //     //     pool.caption[i] = 'TON';
+            //         //     //     decimals = 9;
+            //         //     // } else {
+            //         //     //     pool.caption[i] = filteredAssets[0]!.symbol;
+            //         //     //     decimals = filteredAssets[0]?.decimals!;
+            //         //     // } //init caption
+            //         //     // // const pricePost = await fetchPrice(10 ** decimals * 1000000,  pool.assets[i]!, 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' );
+
+            //         //     // pool.decimals[i] = decimals;
+            //         //     // // const price = pricePost * nativePrice / 10 ** 6 /1000000;
+            //         //     // // pool.prices[i] = Number(price < 1? price.toPrecision(9):price)  // price in USD
+            //         //     // // if(pool.assets[i] == 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA')
+            //         //     // // pool.prices[i] = nativePrice;
+            //         //     pool.TVL += pool.prices[i]! * pool.reserves[i]!;
+            //         // } else {
+            //         //     flag = false;
+            //         // }
+            //         flag = true;
+            //     } catch (error) {
+            //         console.log(`Error in async operation for pool ${index}, asset ${i}:`, error);
+            //         counter++;
+            //         continue;
+            //     }
+            // }
+            pool.main = checkHaveTrendingCoin(pool);
+            await createPool(pool);
+            // counter++;
+            // if (flag) {
+            //     // eslint-disable-next-line no-empty
+            //     try {
+            //     } catch (error) {
+            //         console.error('Error creating pool:', error);
+            //     }
+            // }
+        })
+    );
     return;
 }
 

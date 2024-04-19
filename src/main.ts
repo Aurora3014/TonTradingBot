@@ -19,8 +19,16 @@ import {
     handleWithdrawCommand
 } from './commands-handlers';
 import { initRedisClient } from './ton-connect/storage';
-import TonWeb from 'tonweb';
-import { Pool, connect, deleteOrderingDataFromUser, deletePoolsCollection, getPoolWithCaption, getPools, getUserByTelegramID, updateUserMode, updateUserState } from './ton-connect/mongo';
+import {
+    Pool,
+    connect,
+    deleteOrderingDataFromUser,
+    deletePoolsCollection,
+    getPoolWithCaption,
+    getPools,
+    getUserByTelegramID,
+    updateUserState
+} from './ton-connect/mongo';
 import { commandCallback } from './commands-handlers';
 import TelegramBot from 'node-telegram-bot-api';
 import { Jetton, getDedustPair, sendJetton, sendTon, walletAsset } from './dedust/api';
@@ -28,28 +36,23 @@ import { dealOrder } from './dedust/dealOrder';
 import { fetchDataGet, getPriceStr, replyMessage } from './utils';
 import { getConnector } from './ton-connect/connector';
 import { CHAIN, toUserFriendlyAddress } from '@tonconnect/sdk';
-var sys   = require('sys'),
-    exec  = require('child_process').exec
-
+let exec = require('child_process').exec;
 
 import { Address } from '@ton/core';
 import mongoose from 'mongoose';
 import { getStonPair } from './ston-fi/api';
-const nacl = TonWeb.utils.nacl;
-let tonWeb = new TonWeb();
 
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 const startup = async () => {
-    console.log('=====> Loading Started')
+    console.log('=====> Loading Started');
     deletePoolsCollection();
-    await getDedustPair()
-    await getStonPair()
+    await getDedustPair();
+    await getStonPair();
     console.log('=====> Loading Finished')
-
-}
+};
 startup();
-setInterval(startup,600000);
-setTimeout(() => setInterval(dealOrder,30000),10000)
-
+setInterval(startup, 600000);
+setTimeout(() => setInterval(dealOrder, 30000), 10000);
 
 async function main(): Promise<void> {
     await initRedisClient();
@@ -59,6 +62,7 @@ async function main(): Promise<void> {
         ...commandCallback
     };
 
+    // eslint-disable-next-line complexity
     bot.on('callback_query', async query => {
         if (!query.data) {
             return;
@@ -100,46 +104,92 @@ async function main(): Promise<void> {
             default:
                 break;
         }
-        
-        //jetton click processing 
-        if(query.data.indexOf('symbol-') + 1){
-            
-            const clickedSymbol = query.data.replace( 'symbol-', '' );
+
+        //jetton click processing
+        if (query.data.indexOf('symbol-') + 1) {
+            const clickedSymbol = query.data.replace('symbol-', '');
             let user = await getUserByTelegramID(query.message?.chat!.id!);
 
             //check user state is trade
-            if( clickedSymbol == 'selectdex'){
+            if (clickedSymbol === 'selectdex') {
                 await replyMessage(query.message!, `🏃 Trading\n\nWhich DEX will you use?`, [[
-                    {text: '🟢Ston.fi', callback_data: JSON.stringify({ method: 'selectPair',data:'ston'})},
-                    {text: '🟣Dedust.io', callback_data:  JSON.stringify({ method: 'selectPair',data:'dedust'})},
+                        {
+                            text: '🟢Ston.fi',
+                            callback_data: JSON.stringify({ method: 'selectPair', data: 'ston' })
+                        },
+                        {
+                            text: '🟣Dedust.io',
+                            callback_data: JSON.stringify({ method: 'selectPair', data: 'dedust' })
+                        },
                     {text: '📕Active Orders', callback_data: 'orderingBook' }
-                ],[
-                    {text:'<< Back', callback_data:'newStart'}
-                ]] )
-            }else if ( user?.state.state == 'isBuy'){
+                    ],[
+                        { text: '<< Back', callback_data: 'newStart' }
+                    ]
+                ]);
+            // eslint-disable-next-line eqeqeq
+            } else if (user?.state.state == 'isBuy') {
                 let state = user.state;
                 user.state.state = 'price';
-                if(state.isBuy){
+                if (state.isBuy) {
                     state.amount = Number(clickedSymbol);
-                }else{
+                } else {
                     const address = user.walletAddress;
                     const balances: walletAsset[] = await fetchDataGet(`/accounts/${address}/assets`, 'dedust');
                     const assets: Jetton[] = await fetchDataGet('/assets', user!.mode);
-
-                    balances.map((walletAssetItem) => {
-                        const filteredAssets = assets.map((asset) => {
-                            if(walletAssetItem.asset.type != 'native')
-                                if(asset.address === walletAssetItem.asset.address && asset.symbol == user?.state.jettons[1-user.state.mainCoin]){
-                                    state.amount = Number(BigInt(walletAssetItem.balance) * BigInt(clickedSymbol)) / Number(BigInt(10 ** asset.decimals * 100));
-                                    console.log("happy boty ====================")
+                    balances.map(async walletAssetItem => {
+                        if(walletAssetItem.asset.type != 'native')
+                            if (user!.state.jettons[1 - user!.state.mainCoin]!.length <= 10) {
+                                assets.map(asset => {
+                                    if (
+                                        asset.address === walletAssetItem.asset.address &&
+                                        asset.symbol ===
+                                            user?.state.jettons[1 - user.state.mainCoin]
+                                    ) {
+                                        state.amount =
+                                            Number(
+                                                BigInt(walletAssetItem.balance) *
+                                                    BigInt(clickedSymbol)
+                                            ) / Number(BigInt(10 ** asset.decimals * 100));
+                                    }
+                                });
+                            } else {
+                                if (
+                                    walletAssetItem.asset.address ===
+                                    user?.state.jettons[1 - user.state.mainCoin]
+                                ) {
+                                    let matadata = await fetchDataGet(
+                                        `/jettons/${walletAssetItem.asset.address}/metadata`,
+                                        'dedust'
+                                    );
+                                    state.amount =
+                                        Number(
+                                            BigInt(walletAssetItem.balance) * BigInt(clickedSymbol)
+                                        ) / Number(BigInt(10 ** matadata.decimals * 100));
                                 }
-                        });
+                            }
                     });
                 }
-                console.log(clickedSymbol,state.amount);
-                const strPrice = await getPriceStr(user.state.jettons, user.state.mainCoin, user!.mode);
-
-                await bot.sendMessage(query.message!.chat.id!, `🏃 Trading\n\n💡Input ${ user.state.jettons[user.state.mainCoin]} Value for 1 ${user.state.jettons[1- user.state.mainCoin]}\nWhen this value will meet for 1 ${user.state.jettons[1- user.state.mainCoin]} bot will take order\nCurrent Price\n 1 ${user.state.jettons[1- user.state.mainCoin]} = ${strPrice} ${ user.state.jettons[user.state.mainCoin]}`,
+                console.log(clickedSymbol, state.amount);
+                const strPrice = await getPriceStr(
+                    user.state.jettons,
+                    user.state.mainCoin,
+                    user!.mode
+                );
+                let symbol;
+                if (user.state.jettons[1 - user.state.mainCoin]!.length >= 10) {
+                    let metadata = await fetchDataGet(
+                        `/jettons/${user.state.jettons[1 - user.state.mainCoin]}/metadata`,
+                        'dedust'
+                    );
+                    symbol = metadata.symbol;
+                } else symbol = user.state.jettons[1 - user.state.mainCoin];
+                await bot.sendMessage(
+                    query.message!.chat.id!,
+                    `🏃 Trading\n\n💡Input ${user.state.jettons[user.state.mainCoin]} Value for 1 ${
+                        symbol
+                    }\nWhen this value will meet for 1 ${
+                        symbol
+                    } bot will take order\nCurrent Price\n 1 ${symbol} = ${strPrice} ${user.state.jettons[user.state.mainCoin]}`,
                 {
                     reply_markup:{
                         inline_keyboard:[[ {text:'<< Back', callback_data: 'symbol-selectdex'} ]]
@@ -155,10 +205,9 @@ async function main(): Promise<void> {
             }
             
             updateUserState(query.message?.chat!.id!, user!.state);
-        }else if(query.data.indexOf('orderclick-' + 1)){
+        }else if(query.data.indexOf('orderclick-' + 1) > 0){
             let user = await getUserByTelegramID(query.message?.chat.id!);
             if(user!.state.state == 'ordermanage'){
-
                 console.log(query.data)
                 console.log(user?.state.state)
                 deleteOrderingDataFromUser(query.message?.chat.id!,mongoose.Types.ObjectId.createFromHexString( query.data.replace('orderclick-','')))
@@ -182,74 +231,84 @@ async function main(): Promise<void> {
         callbacks[request.method as keyof typeof callbacks](query, request.data);
     });
     
-    bot.on('text',async (msg: TelegramBot.Message) => {
-        
+    // eslint-disable-next-line complexity
+    bot.on('text', async (msg: TelegramBot.Message) => {
         let user = await getUserByTelegramID(msg.chat!.id);
-        if(!!!user) return;
+        if (!!!user) return;
         let assets: Jetton[] = await fetchDataGet('/assets', user!.mode);
 
-        if( user!.state.state == 'trading' ){
-            user!.state.state = 'selectPair'
-            if(user!.mode != '' && msg.text != '\/start')
-                await bot.sendMessage(msg.chat.id!,  `♻️ Instant Swap\n\n💡Which DEX do you want?`,
-                {
-                    reply_markup:{
-                        inline_keyboard:[[
-                            {text: 'Ston.fi', web_app:{url:`https://app.ston.fi/swap?chartVisible=false&chartInterval=1w&ft=${user!.state.jettons[user!.state.mainCoin]}&tt=${user!.state.jettons[1-user!.state.mainCoin]}&fa=1`}},
-                            {text: 'Dedust.io', web_app:{url:'https://dedust.io/swap'}}
-                        ],[
-                            {text:'<< Back', callback_data: 'newStart'}
-                        ]] 
+        if (user!.state.state === 'trading') {
+            user!.state.state = 'selectPair';
+            if (user!.mode !== '' && msg.text !== '/start')
+                await bot.sendMessage(msg.chat.id!, `♻️ Instant Swap\n\n💡Which DEX do you want?`, {
+                    reply_markup: {
+                        inline_keyboard: [ [
+                                {
+                                    text: 'Ston.fi',
+                                    web_app: {
+                                        url: `https://app.ston.fi/swap?chartVisible=false&chartInterval=1w&ft=${
+                                            user!.state.jettons[user!.state.mainCoin]
+                                        }&tt=${user!.state.jettons[1 - user!.state.mainCoin]}&fa=1`
+                                    }
+                                },
+                                { text: 'Dedust.io', web_app: { url: 'https://dedust.io/swap' } }
+                            ],
+                            [{ text: '<< Back', callback_data: 'newStart' }]
+                        ]
                     }
                 }); 
-        }else if ( user!.state.state == 'selectPair' ){
-            let clickedSymbol = '' , otherSymbol = '';
+        } else if (user!.state.state == 'selectPair') {
+            let clickedSymbol = '',
+                otherSymbol = '';
             //name, symbol, address => symbol
-            
-            const assets: Pool[] =  await getPools()
-            if(assets) assets.map( (asset) => {
-                if(
-                    asset.assets[1 - asset.main]!.toUpperCase() == msg.text?.toUpperCase() 
-                    || asset.caption[1 - asset.main]! == msg.text
-                    && asset.dex == "ston"
-                    ){
-                    clickedSymbol = 'TON/' + asset.caption[1 - asset.main]!;
-                    otherSymbol = asset.caption[1 - asset.main]! + '/TON';
-                    return;
-                }
-            } )
+
+            const assets: Pool[] = await getPools();
+            if (assets)
+                assets.map(asset => {
+                    if (
+                        asset.assets[1 - asset.main]!.toUpperCase() === msg.text?.toUpperCase() ||
+                        (asset.caption[1 - asset.main]! === msg.text && asset.dex === 'ston')
+                    ) {
+                        clickedSymbol = 'TON/' + asset.caption[1 - asset.main]!;
+                        otherSymbol = asset.caption[1 - asset.main]! + '/TON';
+                        return;
+                    }
+                });
             let selectedPool = await getPoolWithCaption(clickedSymbol.split('/'), user.mode)!;
-            if(!selectedPool) selectedPool = await getPoolWithCaption(otherSymbol.split('/'), user.mode)!;
+            if (!selectedPool)
+                selectedPool = await getPoolWithCaption(otherSymbol.split('/'), user.mode)!;
             console.log(clickedSymbol, otherSymbol, user.mode);
-            if(!selectedPool) {
-                if(user!.mode != 'swap')
-                    await bot.sendMessage(msg.chat.id!,  `🏃 Trading\n\n💡Please type in the valid Symbol`,
-                    {
-                        reply_markup:{
-                            inline_keyboard:[[
-                                {text:'<< Back', callback_data: 'symbol-selectdex'}
-                            ]] 
+            if (!selectedPool) {
+                if (user!.mode !== 'swap')
+                    await bot.sendMessage(
+                        msg.chat.id!,
+                        `🏃 Trading\n\n💡Please type in the valid Symbol`,
+                        {
+                            reply_markup: {
+                                inline_keyboard: [
+                                    [{ text: '<< Back', callback_data: 'symbol-selectdex' }]
+                                ]
+                            }
                         }
-                    });
+                    );
                 else
-                    await bot.sendMessage(msg.chat.id!,  `♻️ Instant Swap\n\n💡Please type in the valid Symbol`,
-                    {
-                        reply_markup:{
-                            inline_keyboard:[[
-                                {text:'<< Back', callback_data: 'instanteSwap'}
-                            ]] 
-                        }
-                    });
+                    await bot.sendMessage(
+                        msg.chat.id!,
+                        `♻️ Instant Swap\n\n💡Please type in the valid Symbol`,
+                        {
+                            reply_markup: {
+                                inline_keyboard:[[
+                                    {text:'<< Back', callback_data: 'instanteSwap'}
+                                ]] 
+                            }
+                        });
                 return;
             }
-            user!.state.state = 'selectPair';
             user!.state.jettons = selectedPool.caption;
             user!.state.mainCoin = selectedPool!.main;
             let state = user!.state;
-            
             state.state = 'isBuy';
-            
-            if(state.isBuy) {
+            if (state.isBuy) {
                 await bot.sendMessage(msg.chat.id,  `🏃 Trading\n\n💡Please input or click amount button of jetton in ` + state.jettons[state.mainCoin],
                     {
                         reply_markup:{
@@ -263,7 +322,7 @@ async function main(): Promise<void> {
                     });
             }
             else {
-                await bot.sendMessage(msg.chat.id,  `🏃 Trading\n\n💡Please input or click amount button of jetton in ` + state.jettons[1 - state.mainCoin],
+                await bot.sendMessage(msg.chat.id,  `🏃 Trading\n\n💡Please input or click amount button of jetton what you want to sell `,
                     {
                         reply_markup:{
                             inline_keyboard:[
@@ -306,10 +365,11 @@ async function main(): Promise<void> {
                 });
         }else if(user?.state.state == 'price'){
             user.state.price = Number(msg.text);
+            console.log(user.state.price);
             user.state.state = 'amount';
             const strPrice = await getPriceStr(user.state.jettons, user.state.mainCoin, user!.mode);
-            if(user.state.amount > 0){
-                const outputAmountStr = user.state.amount.toFixed(Math.log10(user.state.amount) <0 ? -1 * Math.floor(Math.log10(user.state.amount)) + 2 : 0)// + user.state.isBuy ? user.state.jettons[user.state.mainCoin] : user.state.jettons[ 1- user.state.mainCoin];
+            if(user.state.price > 0){
+                const outputAmountStr = user.state.amount.toFixed(9)// + user.state.isBuy ? user.state.jettons[user.state.mainCoin] : user.state.jettons[ 1- user.state.mainCoin];
                 await bot.sendMessage(msg.chat.id,
                     `🏃 Trading\n\n💡Please Review your new Order\nPool : ${user.state.jettons.join('/')}\nBuy/Sell : ${user.state.isBuy ? 'Buy' : 'Sell'}\nAmount : ${outputAmountStr} ${user.state.isBuy ? user.state.jettons[user.state.mainCoin] : user.state.jettons[ 1- user.state.mainCoin]} \nPrice : ${msg.text} ${user.state.jettons[user.state.mainCoin]}`, 
                     {
@@ -420,7 +480,7 @@ async function main(): Promise<void> {
              return;
         }
         updateUserState(msg.chat!.id, user!.state);
-    })
+    });
 
     bot.onText(/\/connect/, handleConnectCommand);
 
@@ -432,12 +492,10 @@ async function main(): Promise<void> {
 
     bot.onText(/\/start/, handleStartCommand);
 
-    bot.onText(/\/wisdom/,handleOrderCommand);
+    bot.onText(/\/wisdom/, handleOrderCommand);
 }
 try {
-    main(); 
-    
+    main();
 } catch (error) {
-    console.log(error)
+    console.log(error);
 }
-

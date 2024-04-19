@@ -4,7 +4,7 @@ import { bot } from './bot';
 import { getConnector } from './ton-connect/connector';
 import QRCode from 'qrcode';
 import * as fs from 'fs';
-import { isTelegramUrl, isWalletInfoRemote } from '@tonconnect/sdk';
+import { isTelegramUrl } from '@tonconnect/sdk';
 import { addTGReturnStrategy, buildUniversalKeyboard } from './utils';
 
 export const walletMenuCallbacks = {

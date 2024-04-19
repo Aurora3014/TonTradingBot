@@ -2,119 +2,177 @@ import { CHAIN, isTelegramUrl, toUserFriendlyAddress, UserRejectsError } from '@
 import { bot } from './bot';
 import { getWallets, getWalletInfo } from './ton-connect/wallets';
 import QRCode from 'qrcode';
-import TelegramBot, { CallbackQuery, InlineKeyboardButton,Message } from 'node-telegram-bot-api';
+import TelegramBot, { CallbackQuery, InlineKeyboardButton } from 'node-telegram-bot-api';
 import { getConnector } from './ton-connect/connector';
-import { addTGReturnStrategy, buildUniversalKeyboard, fetchDataGet, getPriceStr, pTimeout, pTimeoutException , replyMessage} from './utils';
-import { addNewWalletToUser, addOrderingDataToUser, createUser, getPools, getPoolWithCaption, getUserByTelegramID, OrderingData, updateUserMode, updateUserState,updateWallet,User, UserModel } from './ton-connect/mongo';
-import TonWeb from 'tonweb';
-import nacl from 'tweetnacl';
-import { Jetton, walletAsset } from './dedust/api';
+import {
+    addTGReturnStrategy,
+    buildUniversalKeyboard,
+    fetchDataGet,
+    pTimeout,
+    pTimeoutException,
+    replyMessage
+} from './utils';
+import {
+    addNewWalletToUser,
+    addOrderingDataToUser,
+    createUser,
+    getPools,
+    getPoolWithCaption,
+    getUserByTelegramID,
+    OrderingData,
+    updateUserMode,
+    updateUserState,
+    updateWallet,
+    UserModel
+} from './ton-connect/mongo';
 import { mnemonicNew, mnemonicToPrivateKey } from '@ton/crypto';
 import { TonClient4, WalletContractV4 } from 'ton';
-import { dealOrder } from './dedust/dealOrder';
-import mongoose, { Callback } from 'mongoose';
-let tonWeb = new TonWeb();
+import mongoose from 'mongoose';
+import { Jetton, walletAsset } from './dedust/api';
 
 let newConnectRequestListenersMap = new Map<number, () => void>();
 const tonClient = new TonClient4({ endpoint: 'https://mainnet-v4.tonhubapi.com' });
 
 export const commandCallback = {
-    tradingCallback:handleTradingCallback,
-    addNewOrder:handleAddNewOrder,
-    addNewWallet:handleAddNewWallet,
+    tradingCallback: handleTradingCallback,
+    addNewOrder: handleAddNewOrder,
+    addNewWallet: handleAddNewWallet,
     walletSelect: handleWalletSelect,
     selectPair: handleSelectPair
 }
-async function handleSelectPair(query:CallbackQuery, _: string){
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+async function handleSelectPair(query: CallbackQuery, _: string) {
     await updateUserMode(query.message?.chat!.id!, _);
     let user = await getUserByTelegramID(query.message?.chat!.id!);
     user!.state.state = 'trading';
-    if(user!.mode != 'swap')
-        await replyMessage(query.message!, `🏃 Trading\n\nDo you want to buy/sell?`, [[
-            {text: '🟢Buy', callback_data: JSON.stringify({ method: 'tradingCallback',data:'true'})},
-            {text: '🔴Sell', callback_data:  JSON.stringify({ method: 'tradingCallback',data:'false'})},
-        ],[
-            {text:'<< Back', callback_data:'symbol-selectdex'}
-        ]] )
-
+    if (user!.mode !== 'swap')
+        await replyMessage(query.message!, `🏃 Trading\n\nDo you want to buy/sell?`, [
+            [
+                {
+                    text: '🟢Buy',
+                    callback_data: JSON.stringify({ method: 'tradingCallback', data: 'true' })
+                },
+                {
+                    text: '🔴Sell',
+                    callback_data: JSON.stringify({ method: 'tradingCallback', data: 'false' })
+                }
+            ],
+            [{ text: '<< Back', callback_data: 'symbol-selectdex' }]
+        ]);
 }
-async function handleAddNewOrder(query: CallbackQuery){
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+async function handleAddNewOrder(query: CallbackQuery) {
     console.log(query);
     const user = await getUserByTelegramID(query.message?.chat!.id!);
     let newOrder = {
-        _id:  new mongoose.Types.ObjectId(),
+        _id: new mongoose.Types.ObjectId(),
         amount: user?.state.amount!,
         jettons: user?.state.jettons!,
         mainCoin: user?.state.mainCoin!,
         isBuy: user?.state.isBuy!,
         price: user?.state.price!,
         state: '',
-        dex:user?.mode!
+        dex: user?.mode!
     };
     //check balance
-    
-    let mainId = 0, flag = false;
+    let mainId = 0,
+        flag = false;
     const pool = await getPoolWithCaption(user?.state.jettons!, user!.mode);
-    const walletBalance: walletAsset[] = await fetchDataGet(`/accounts/${user?.walletAddress}/assets`, 'dedust');
-    
-    
-    console.log(walletBalance[0], user?.state.amount);
-    if(user?.state.isBuy )
-        if(walletBalance[0]?.balance! >= user?.state.amount) {
+    const walletBalance: walletAsset[] = await fetchDataGet(
+        `/accounts/${user?.walletAddress}/assets`,
+        'dedust'
+    );
+
+    if (user?.state.isBuy) {
+        //if buy the token is TON
+        if (walletBalance[0]?.balance! >= user?.state.amount) {
             await addOrderingDataToUser(query.message?.chat!.id!, newOrder);
             //const priceStr = getPriceStr(user.state.jettons,user.state.mainCoin, user!.mode);
             //newOrder.amount *= user.state.isBuy ? user.state.price : 1/user.state.price
-            bot.sendMessage(query.message!.chat.id,`New Order is Succesfuly booked, Press /start`);
-        }
-        else bot.sendMessage(query.message!.chat.id,`New Order is failed due to invalid balance, Press /start`);
-    else{
-        walletBalance.forEach(async (walletasset) => {
-            if(user?.state.isBuy) mainId =  user?.state.mainCoin;
+            bot.sendMessage(query.message!.chat.id, `New Order is Succesfuly booked, Press /start`);
+        } else
+            bot.sendMessage(
+                query.message!.chat.id,
+                `New Order is failed due to invalid balance, Press /start`
+            );
+    } else {
+        //if sell the token is specified one
+        walletBalance.forEach(async walletasset => {
+            if (user?.state.isBuy) mainId = user?.state.mainCoin;
             else mainId = 1 - user?.state.mainCoin!;
-    
-            const assets: Jetton[] = await fetchDataGet('/assets',user!.mode);
-            
-            assets.forEach(async (asset) => {
-                //find wallet asset's symbol => asset.symbol
-                if(asset.address == walletasset.asset.address && !flag){
-                    //check if the symbol's balance is available
-                    if(asset.symbol == user?.state.jettons[mainId] && !flag){
-                        console.log('#####################', asset.symbol);
-                        flag = true;
-    
-                        if( walletasset.balance < user.state.amount){
-                            bot.sendMessage(query.message!.chat.id,`Your ${user?.state.jettons[mainId]} balance is not enough!  Press /start`);
-                        }else {
-                            await addOrderingDataToUser(query.message?.chat!.id!, newOrder);
-                            bot.sendMessage(query.message!.chat.id,`New Order is Succesfuly booked, Press /start`);
+            const assets: Jetton[] = await fetchDataGet('/assets', 'ston');
+            const is_ca = user!.state.jettons[mainId]!.length < 10;
+            if (is_ca)
+                //dedust listed tokens
+                assets.forEach(async asset => {
+                    //find wallet asset's symbol => asset.symbol
+                    if (asset.address === walletasset.asset.address && !flag) {
+                        //check if the symbol's balance is available
+                        if (asset.symbol === user?.state.jettons[mainId] && !flag) {
+                            console.log('########## True ###########\n', asset.symbol);
+                            flag = true;
+
+                            if (walletasset.balance < user.state.amount * 10 ** asset.decimals) {
+                                bot.sendMessage(
+                                    query.message!.chat.id,
+                                    `Your ${user?.state.jettons[mainId]} balance is not enough!  Press /start`
+                                );
+                            } else {
+                                await addOrderingDataToUser(query.message?.chat!.id!, newOrder);
+                                bot.sendMessage(
+                                    query.message!.chat.id,
+                                    `New Order is Succesfuly booked, Press /start`
+                                );
+                            }
+                            return;
                         }
-                        
-                        return;
                     }
+                });
+            else {
+                //dedust unlisted tokens
+                if (walletasset.asset.address === user?.state.jettons[mainId]) {
+                    let metadata = await fetchDataGet(
+                        `/jettons/${walletasset.asset.address}/metadata`,
+                        'dedust'
+                    );
+
+                    if (
+                        10 ** Number(metadata.decimals) * user.state.amount! <
+                        walletasset.balance
+                    ) {
+                        await addOrderingDataToUser(query.message?.chat!.id!, newOrder);
+                        bot.sendMessage(
+                            query.message!.chat.id,
+                            `New Order is Succesfuly booked, Press /start`
+                        );
+                        flag = true;
+                    }
+
                 }
-            })
-            if(flag) return;
-        })
+            }
+            if (flag) return;
+        });
     }
 }
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export async function handleOrderCommand(msg: TelegramBot.Message){
     let user = await getUserByTelegramID(msg?.chat!.id!);
     let state = user?.state;
     state!.state = 'waitfororder';
     updateUserState(msg?.chat!.id!, state!);
 }
-async function handleTradingCallback (query: CallbackQuery, _:string){
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+async function handleTradingCallback(query: CallbackQuery, _: string) {
     try {
         //update user state string
-        
+
         let user = await getUserByTelegramID(query.message?.chat!.id!);
         user!.state.state = 'selectPair';
+        // eslint-disable-next-line eqeqeq
         user!.state.isBuy = _ == 'true';
-        console.log('trading',_)
+        console.log('trading', _);
         updateUserState(query.message?.chat!.id!, user!.state);
         //fetch assets from dedust API
-        const pools = await getPools();
-        const rows = Math.ceil(pools!.length / 4);
 
         // let keyboardArray: InlineKeyboardButton[][] = []; // Type annotation for keyboardArray
         // const filteredAssets = pools!.filter(pool => pool !== undefined);
@@ -124,68 +182,96 @@ async function handleTradingCallback (query: CallbackQuery, _:string){
         //     keyboardArray[Math.floor(index / 4)]![index % 4] = {text: caption, callback_data: `symbol-${caption}`};
         // });
         // keyboardArray.push([{text:'<< Back', callback_data: 'newStart'}]);
-    
-        await bot.editMessageCaption(
-            `🏃 Trading\n\n💡Please type in correct Jetton's Symbol/Name/address\n\nFor example:\n🔸"jUSDT" NOT "jusdt" or "JUSDT"\n🔸"Ton Bridge USD"\n🔸"EQBynBO23yw ... STQgGoXwiuA"`,
-            {
+        let text = `🏃 Trading\n\n💡Please type in correct Jetton's Symbol/Name/address\nType in CA for new published tokens.\n\nFor example:\n🔸"jUSDT" NOT "jusdt" or "JUSDT"\n🔸"Ton Bridge USD"\n🔸"EQBynBO23yw ... STQgGoXwiuA"`;
+        await bot
+            .editMessageCaption(text, {
                 message_id: query.message?.message_id,
                 chat_id: query.message?.chat.id
-            }
-        )
+            })
+            .then(() => {})
+            .catch(async () => {
+                await bot.editMessageText(text, {
+                    message_id: query.message?.message_id,
+                    chat_id: query.message?.chat.id,
+                    parse_mode: 'HTML'
+                });
+            });
         await bot.editMessageReplyMarkup(
-            { inline_keyboard: [[{text:'<< Back', callback_data: 'symbol-selectdex'}]] },
+            { inline_keyboard: [[{ text: '<< Back', callback_data: 'symbol-selectdex' }]] },
             {
                 message_id: query.message?.message_id,
                 chat_id: query.message?.chat.id
             }
         );
-            
     } catch (error) {
-        console.log(error)
+        console.log(error);
     }
 }
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export async function handleOrderingBookCommand(query: CallbackQuery){
     let user = await getUserByTelegramID(query.message!.chat.id);
     let orderingBtns: InlineKeyboardButton[][] = [];
-    user?.orderingData?.map((order,index)=>{
-        if(orderingBtns[index])orderingBtns[index] = [];
-        orderingBtns[index] = [{text: order.isBuy?'Buy ' + order.jettons[1-order.mainCoin] + ' from ' + order.amount + ' ' + order.jettons[order.mainCoin] + ' at 1' + order.jettons[1- order.mainCoin] + '=' + order.price + ' ' + order.jettons[order.mainCoin]:'Sell '+order.amount + ' ' + order.jettons[1-order.mainCoin] + ' at 1 ' + order.jettons[1- order.mainCoin] + '=' + order.price + ' ' + order.jettons[order.mainCoin]
-        ,callback_data: 'orderclick-' + order._id.toHexString()}]
+    user?.orderingData?.map((order, index) => {
+        if (orderingBtns[index]) orderingBtns[index] = [];
+        orderingBtns[index] = [
+            {
+                text: order.isBuy
+                    ? 'Buy ' +
+                      order.jettons[1 - order.mainCoin] +
+                      ' from ' +
+                      order.amount +
+                      ' ' +
+                      order.jettons[order.mainCoin] +
+                      ' at 1' +
+                      order.jettons[1 - order.mainCoin] +
+                      '=' +
+                      order.price +
+                      ' ' +
+                      order.jettons[order.mainCoin]
+                    : 'Sell ' +
+                      order.amount +
+                      ' ' +
+                      order.jettons[1 - order.mainCoin] +
+                      ' at 1 ' +
+                      order.jettons[1 - order.mainCoin] +
+                      '=' +
+                      order.price +
+                      ' ' +
+                      order.jettons[order.mainCoin],
+                callback_data: 'orderclick-' + order._id.toHexString()
+            }
+        ];
     })
-    orderingBtns.push([{text:'<< Back', callback_data:'symbol-selectdex'}]);
+    orderingBtns.push([{ text: '<< Back', callback_data: 'symbol-selectdex' }]);
     let state: OrderingData = user?.state!;
-    state!.state='ordermanage'
-    updateUserState(query.message?.chat.id!,state);
-    replyMessage(query.message!,`📕 Ordering Book\n\nClick order button to delete`,orderingBtns);
+    state!.state = 'ordermanage';
+    updateUserState(query.message?.chat.id!, state);
+    replyMessage(query.message!, `📕 Ordering Book\n\nClick order button to delete`, orderingBtns);
 }
-export async function handleStartCommand (msg: TelegramBot.Message)  {
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+export async function handleStartCommand(msg: TelegramBot.Message) {
     //update / create user info
-    const userId = msg.chat?.id ?? 0;
+    const userId = msg.chat!.id;
+    console.log(userId);
     let prevUser = await getUserByTelegramID(userId);
     let telegramWalletAddress;
-    let message;
 
-    if (prevUser){
-         message = 'Welcome Back! ' + msg.chat?.first_name;
-         telegramWalletAddress = prevUser.walletAddress;
-         //set userstate idle
+    if (prevUser) {
+        //set userstate idle
         await updateUserState(userId,{
             _id: new mongoose.Types.ObjectId(),
             state: 'idle',
-            jettons: ['',''],
+            jettons: ['', ''],
             mainCoin: 0,
             amount: 0,
             price: 0,
             isBuy: false,
-            dex: ''
+            dex: '',
         });
-        }
-    else {
-        
+    } else {
         let mnemonics = await mnemonicNew();
         let keyPair = await mnemonicToPrivateKey(mnemonics);
         // Create wallet contract
-        let workchain = 0; 
         // Usually you need a workchain 0
         const wallet = tonClient.open(
             WalletContractV4.create({
@@ -194,27 +280,28 @@ export async function handleStartCommand (msg: TelegramBot.Message)  {
             })
         );
         const address = wallet.address;
-        let newUser = await UserModel.create( {
+        let newUser = await UserModel.create({
             telegramID: msg.chat!.id,
             walletAddress: address.toString(),
             secretKey: mnemonics.join(','),
-            wallets:[mnemonics.join(',')],
+            wallets: [mnemonics.join(',')],
             mode: '',
-            state:{
+            state: {
                 state: 'idle',
-                jettons: ['',''],
+                jettons: ['', ''],
                 mainCoin: 0,
                 amount: 0,
                 price: 0,
                 isBuy: false,
-                dex:''
+                dex: ''
             }
         });
         await createUser(newUser);
         //save in variable to show
+        // eslint-disable-next-line unused-imports/no-unused-vars
         telegramWalletAddress = address.toString();
     }
-    await bot.sendPhoto(msg.chat.id,"./imgpsh_fullsize_anim.png",{
+    await bot.sendPhoto(msg.chat.id, './imgpsh_fullsize_anim.png', {
         caption: `
 *What can Reward.tg TraderBot do for you :*
 
@@ -228,45 +315,64 @@ export async function handleStartCommand (msg: TelegramBot.Message)  {
 Type /start to start your *Reward.tg* bot !  `,
         reply_markup:{
             inline_keyboard:[
-                [{text:'💵 My wallet', callback_data:'showMyWallet'}],
-                [{text:'♻️ Instant Swap', callback_data:'instanteSwap'},{text:'🏃 Book Order',/*web_app:{url:'https://web.ton-rocket.com/trade'}*/ callback_data:'symbol-selectdex'}],
-                [{text:'🏆 Exclusif:Earn Reward from TON Token', callback_data:'exclusif'}],
-                [{text:'💡 Token Info ( soon )', callback_data:'instanap'},{text:'🚨 Alert ( soon )',/*web_app:{url:'https://web.ton-rocket.com/trade'}*/ callback_data:'sselectdex'}],
-                [{text:'🔨 Tools and Settings', callback_data:'setting'}],
-                [{text:'🥇 Premium ( soon )', callback_data:'seng'}],
+                [{ text: '💵 My wallet', callback_data: 'showMyWallet' }],
+                [
+                    { text: '♻️ Instant Swap', callback_data: 'instanteSwap' },
+                    {
+                        text: '🏃 Book Order',
+                        /*web_app:{url:'https://web.ton-rocket.com/trade'}*/ callback_data:
+                            'symbol-selectdex'
+                    }
+                ],
+                [{ text: '🏆 Exclusif:Earn Reward from TON Token', callback_data: 'exclusif' }],
+                [
+                    { text: '💡 Token Info ( soon )', callback_data: 'instanap' },
+                    {
+                        text: '🚨 Alert ( soon )',
+                        /*web_app:{url:'https://web.ton-rocket.com/trade'}*/ callback_data:
+                            'sselectdex'
+                    }
+                ],
+                [{ text: '🔨 Tools and Settings', callback_data: 'setting' }],
+                [{ text: '🥇 Premium ( soon )', callback_data: 'seng' }]
                 //[{text:'🔗 Connect Your Wallet',callback_data:'walletConnect'},{text:'✂ Disconnect Wallet', callback_data:'disConnect'}],
                 //[{text:'📤 Deposit', callback_data:'deposit'},{text:'📥 Withdraw', callback_data:'withdraw'}],
             ]
         },
-        parse_mode:'Markdown'
+        parse_mode: 'Markdown'
     });
 }
 
 export async function handleAddNewWallet(query: CallbackQuery): Promise<void> {
     let mnemonics = await mnemonicNew();
-    await addNewWalletToUser(query.message?.chat.id!,mnemonics.join(','));
+    await addNewWalletToUser(query.message?.chat.id!, mnemonics.join(','));
     await handleShowMyWalletCommand(query.message!);
 }
 
-export async function handleWalletSelect(query: CallbackQuery, _:string): Promise<void> {
+export async function handleWalletSelect(query: CallbackQuery, _: string): Promise<void> {
     const user = await getUserByTelegramID(query.message?.chat.id!);
     let mnemonic = user!.wallets[Number(_)]!.split(',')
     let keyPair = await mnemonicToPrivateKey(mnemonic);
-    
+
     const wallet = tonClient.open(
         WalletContractV4.create({
             workchain: 0,
             publicKey: keyPair!.publicKey
         })
     );
+    console.log(mnemonic);
+    console.log(wallet.address.toString());
     await updateWallet( query.message?.chat.id!,
         wallet.address.toString(),
         user!.wallets[Number(_)]!
     );
     await handleShowMyWalletCommand(query.message!)
 }
-export async function handleExclusifCommand(query:CallbackQuery):Promise<void>{
-    bot.sendMessage(query.message?.chat.id!,'Joins now https://reward.tg and earn each day exclusif reward from all TON token on TON chain.');
+export async function handleExclusifCommand(query: CallbackQuery): Promise<void> {
+    bot.sendMessage(
+        query.message?.chat.id!,
+        'Joins now https://reward.tg and earn each day exclusif reward from all TON token on TON chain.'
+    );
 }
 export async function handleConnectCommand(msg: TelegramBot.Message): Promise<void> {
     console.log('connect!!');
@@ -309,7 +415,7 @@ export async function handleConnectCommand(msg: TelegramBot.Message): Promise<vo
 
             const walletName =
                 (await getWalletInfo(wallet.device.appName))?.name || wallet.device.appName;
-            await bot.sendMessage(chatId, `🔗 Connect Wallet\n\n${walletName} wallet connected successfully`,{
+            await bot.sendPhoto(chatId, `🔗 Connect Wallet\n\n${walletName} wallet connected successfully`,{
                 reply_markup: {
                     inline_keyboard: [
                         [{text:'<< Back', callback_data: 'newStart'}]
@@ -529,6 +635,7 @@ export async function handleShowMyWalletCommand(msg: TelegramBot.Message): Promi
     const address = user?.walletAddress;
     const balances: walletAsset[] = await fetchDataGet(`/accounts/${address}/assets`, 'dedust');
     const assets: Jetton[] = await fetchDataGet('/assets', 'ston');
+    console.log(balances);
     let outputStr = '\nToncoin : ' + (balances[0]?.balance ? (Number(balances[0]?.balance) / 1000000000) : '0') + ' TON\n\n<b>-ALT TOKEN</b>\n';
 
     balances.map((walletAssetItem) => {
@@ -579,13 +686,21 @@ export async function handleInstanteSwap(query: CallbackQuery): Promise<void> {
         //     keyboardArray[Math.floor(index / 4)]![index % 4] = {text: caption, callback_data: `symbol-${caption}`};
         // });
         // keyboardArray.push([{text:'<< Back', callback_data: 'newStart'}]);
+        let text = `♻️ Instant Swap\n\n💡Please type in correct Jetton's Symbol/Name/address\n\nFor example:\n🔸"jUSDT", NOT "jusdt" or "JUSDT"\n🔸"Ton Bridge USD"\n🔸"EQBynBO23yw ... STQgGoXwiuA"`;
         await bot.editMessageCaption(
-            `♻️ Instant Swap\n\n💡Please type in correct Jetton's Symbol/Name/address\n\nFor example:\n🔸"jUSDT", NOT "jusdt" or "JUSDT"\n🔸"Ton Bridge USD"\n🔸"EQBynBO23yw ... STQgGoXwiuA"`,
+            text,
             {
                 message_id: query.message?.message_id,
                 chat_id: query.message?.chat.id
             }
-        )
+        ).then(() => {})
+        .catch(async () => {
+            await bot.editMessageText(text, {
+                message_id: query.message?.message_id,
+                chat_id: query.message?.chat.id,
+                parse_mode: 'HTML'
+            });
+        });
         await bot.editMessageReplyMarkup(
             { inline_keyboard: [[{text:'<< Back', callback_data: 'newStart'}]] },
             {

@@ -1,4 +1,4 @@
-
+// eslint-disable-next-line @typescript-eslint/no-redeclare
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
 // Define interfaces
@@ -18,7 +18,7 @@ export interface User extends Document {
     walletAddress: string;
     secretKey: string;
     mode: string;
-    wallets: string[]
+    wallets: string[];
     state: OrderingData;
     orderingData?: OrderingData[];
 }
@@ -41,11 +41,11 @@ export interface Pool extends Document {
     dex: string;
 }
 // MongoDB connection URI
-const uri = 'mongodb://dusanpracaex:ilovemysisterwisdom@127.0.0.1:27017/?authSource=admin';
+const uri = 'mongodb://127.0.0.1:27017/';
 
 // Connect to MongoDB
 export async function connect(): Promise<typeof mongoose> {
-  return  mongoose.connect(uri,{tls:false});
+    return mongoose.connect(uri, { tls: false });
 }
 
 // Define Mongoose schemas
@@ -95,7 +95,11 @@ export async function updateUserState(telegramID: number, newState: OrderingData
     await UserModel.updateOne({ telegramID }, { $set: { state: newState } });
 }
 //update wallet addres and secretkey
-export async function updateWallet(telegramID: number, walletAddress: string, secretKey: string): Promise<void> {
+export async function updateWallet(
+    telegramID: number,
+    walletAddress: string,
+    secretKey: string
+): Promise<void> {
     await UserModel.updateOne({ telegramID }, { $set: { walletAddress, secretKey } });
 }
 //update user mode
@@ -119,7 +123,10 @@ export async function getAllUsers(): Promise<User[]> {
 }
 
 // Add ordering data to a user
-export async function addOrderingDataToUser(telegramID: number, orderingData: OrderingData): Promise<void> {
+export async function addOrderingDataToUser(
+    telegramID: number,
+    orderingData: OrderingData
+): Promise<void> {
     await UserModel.updateOne({ telegramID }, { $push: { orderingData } });
 }
 
@@ -129,12 +136,17 @@ export async function addNewWalletToUser(telegramID: number, wallets: string): P
 }
 
 // Delete ordering data from a user
-export async function deleteOrderingDataFromUser(telegramID: number, orderingDataId: mongoose.Types.ObjectId): Promise<void> {
+export async function deleteOrderingDataFromUser(
+    telegramID: number,
+    orderingDataId: mongoose.Types.ObjectId
+): Promise<void> {
     await UserModel.updateOne({ telegramID }, { $pull: { orderingData: { _id: orderingDataId } } });
 }
 
 // Get a user by Telegram ID with ordering data
-export async function getUserByTelegramIDWithOrderingData(telegramID: number): Promise<User | null> {
+export async function getUserByTelegramIDWithOrderingData(
+    telegramID: number
+): Promise<User | null> {
     const user = await UserModel.findOne({ telegramID }).select('+orderingData');
     return user ? (user.toObject() as User) : null;
 }
