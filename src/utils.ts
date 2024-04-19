@@ -20,7 +20,11 @@ export function pTimeout<T>(
         new Promise((_r, rej) => (timer = setTimeout(rej, time, exception)))
     ]).finally(() => clearTimeout(timer)) as Promise<T>;
 }
-
+export async function delay(MS: number): Promise<any> {
+    return new Promise(resolve => {
+        return setTimeout(resolve, MS);
+    });
+}
 export function addTGReturnStrategy(link: string, strategy: string): string {
     const parsed = new URL(link);
     parsed.searchParams.append('ret', strategy);
@@ -141,6 +145,7 @@ export async function fetchDataGet(fetchURL: String, dex: String): Promise<any> 
         }
     } catch (error) {
         console.error('Error fetching data:', error);
+        delay(500)
         console.error('retry');
         return await fetchDataGet(fetchURL, dex);
     }

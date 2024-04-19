@@ -85,7 +85,7 @@ async function handleAddNewOrder(query: CallbackQuery) {
 
     if (user?.state.isBuy) {
         //if buy the token is TON
-        if (walletBalance[0]?.balance! >= user?.state.amount) {
+        if (walletBalance[0]?.balance! >= user?.state.amount * 10 ** 9) {
             await addOrderingDataToUser(query.message?.chat!.id!, newOrder);
             //const priceStr = getPriceStr(user.state.jettons,user.state.mainCoin, user!.mode);
             //newOrder.amount *= user.state.isBuy ? user.state.price : 1/user.state.price
@@ -111,8 +111,7 @@ async function handleAddNewOrder(query: CallbackQuery) {
                         if (asset.symbol === user?.state.jettons[mainId] && !flag) {
                             console.log('########## True ###########\n', asset.symbol);
                             flag = true;
-
-                            if (walletasset.balance < user.state.amount * 10 ** asset.decimals) {
+                            if (walletasset.balance < user.state.amount * 10 ** Number(asset.decimals) ) {
                                 bot.sendMessage(
                                     query.message!.chat.id,
                                     `Your ${user?.state.jettons[mainId]} balance is not enough!  Press /start`
@@ -135,9 +134,9 @@ async function handleAddNewOrder(query: CallbackQuery) {
                         `/jettons/${walletasset.asset.address}/metadata`,
                         'dedust'
                     );
-
+                    console.log(metadata, 10 ** Number(metadata.decimals) * user.state.amount! <= walletasset.balance)
                     if (
-                        10 ** Number(metadata.decimals) * user.state.amount! <
+                        10 ** Number(metadata.decimals) * user.state.amount! <=
                         walletasset.balance
                     ) {
                         await addOrderingDataToUser(query.message?.chat!.id!, newOrder);

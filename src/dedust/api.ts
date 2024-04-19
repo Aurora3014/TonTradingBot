@@ -6,7 +6,7 @@ import { OpenedContract, beginCell, internal,  toNano } from '@ton/core';
 import { Asset, PoolType, ReadinessStatus, JettonRoot } from '@dedust/sdk';
 import axios from 'axios';
 import { mnemonicToPrivateKey, mnemonicToWalletKey } from '@ton/crypto';
-import { fetchDataGet } from '../utils';
+import { delay, fetchDataGet } from '../utils';
 import { Pool, createPool } from '../ton-connect/mongo';
 
 const tonClient = new TonClient4({ endpoint: 'https://mainnet-v4.tonhubapi.com' });
@@ -241,6 +241,7 @@ export async function fetchPrice(amount: number, from: string, to: string, dex: 
         }
     } catch (error) {
         console.log(error);
+        delay(500)
         console.log('retry getPrice');
         return await fetchPrice(amount, from, to, dex);
     }

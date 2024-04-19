@@ -336,28 +336,62 @@ async function main(): Promise<void> {
                 
             }
         }else if(user?.state.state == 'isBuy'){
+            let clickedSymbol = Number( msg.text);
             let state = user.state;
                 user.state.state = 'price';
-                if(state.isBuy){
-                    state.amount = Number(msg.text);
-                }else{
+                if (state.isBuy) {
+                    state.amount = Number(clickedSymbol);
+                } else {
                     const address = user.walletAddress;
                     const balances: walletAsset[] = await fetchDataGet(`/accounts/${address}/assets`, 'dedust');
                     const assets: Jetton[] = await fetchDataGet('/assets', user!.mode);
-
-                    balances.map((walletAssetItem) => {
-                        const filteredAssets = assets.map((asset) => {
-                            if(walletAssetItem.asset.type != 'native')
-                                if(asset.address === walletAssetItem.asset.address && asset.symbol == user?.state.jettons[1-user.state.mainCoin]){
-                                    state.amount = Number(BigInt(walletAssetItem.balance) * BigInt(msg.text!) / BigInt(10 ** asset.decimals * 100));
-                                    console.log("happy boty ====================")
+                    balances.map(async walletAssetItem => {
+                        if(walletAssetItem.asset.type != 'native')
+                            if (user!.state.jettons[1 - user!.state.mainCoin]!.length <= 10) {
+                                assets.map(asset => {
+                                    if (
+                                        asset.address === walletAssetItem.asset.address &&
+                                        asset.symbol ===
+                                            user?.state.jettons[1 - user.state.mainCoin]
+                                    ) {
+                                        state.amount = clickedSymbol * 10 ** asset.decimals
+                                    }
+                                });
+                            } else {
+                                if (
+                                    walletAssetItem.asset.address ===
+                                    user?.state.jettons[1 - user.state.mainCoin]
+                                ) {
+                                    let matadata = await fetchDataGet(
+                                        `/jettons/${walletAssetItem.asset.address}/metadata`,
+                                        'dedust'
+                                    );
+                                    state.amount = clickedSymbol;
                                 }
-                        });
+                            }
                     });
                 }
-                const strPrice = await getPriceStr(user.state.jettons, user.state.mainCoin, user!.mode);
-
-                await bot.sendMessage(msg.chat.id!, `🏃 Trading\n\n💡Input ${ user.state.jettons[user.state.mainCoin]} Value for 1 ${user.state.jettons[1- user.state.mainCoin]}\nWhen this value will meet for 1 ${user.state.jettons[1- user.state.mainCoin]} bot will take order\nCurrent Price\n 1 ${user.state.jettons[1- user.state.mainCoin]} = ${strPrice} ${ user.state.jettons[user.state.mainCoin]}`,
+                console.log(clickedSymbol, state.amount);
+                const strPrice = await getPriceStr(
+                    user.state.jettons,
+                    user.state.mainCoin,
+                    user!.mode
+                );
+                let symbol;
+                if (user.state.jettons[1 - user.state.mainCoin]!.length >= 10) {
+                    let metadata = await fetchDataGet(
+                        `/jettons/${user.state.jettons[1 - user.state.mainCoin]}/metadata`,
+                        'dedust'
+                    );
+                    symbol = metadata.symbol;
+                } else symbol = user.state.jettons[1 - user.state.mainCoin];
+                await bot.sendMessage(
+                    msg.chat.id!,
+                    `🏃 Trading\n\n💡Input ${user.state.jettons[user.state.mainCoin]} Value for 1 ${
+                        symbol
+                    }\nWhen this value will meet for 1 ${
+                        symbol
+                    } bot will take order\nCurrent Price\n 1 ${symbol} = ${strPrice} ${user.state.jettons[user.state.mainCoin]}`,
                 {
                     reply_markup:{
                         inline_keyboard:[[ {text:'<< Back', callback_data: 'symbol-selectdex'} ]]

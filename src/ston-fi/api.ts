@@ -71,7 +71,7 @@ export async function swapJetton(
             // the transaction will bounce
             minAskAmount: new TonWeb.utils.BN(1),
             // query id to identify your transaction in the blockchain (optional)
-            queryId: 5163804699998560,
+            queryId: 51638049998560,
             // address of the wallet to receive the referral fee (optional)
             referralAddress: undefined
         });
@@ -97,7 +97,7 @@ export async function swapJetton(
             amount: new TonWeb.utils.BN((1000000000 / 10) * 3),
             seqno: seqno,
 
-            payload: await tonToJettonTxParams.payload.toBoc()
+            payload: tonToJettonTxParams.payload
         })
         .send();
     // eslint-disable-next-line no-console

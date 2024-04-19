@@ -88,12 +88,16 @@ export async function dealOrder() {
                                 'TX realised, Visit https://tonviewer.com/' + user.walletAddress
                             );
                         } else if (order.dex === 'ston') {
-                            swapJetton(
+                            await swapJetton(
                                 user.walletAddress,
                                 fromAddress,
                                 toAddress,
                                 amount,
                                 mnemonic
+                            );
+                            bot.sendMessage(
+                                user.telegramID,
+                                'TX realised, Visit https://tonviewer.com/' + user.walletAddress
                             );
                         }
                          deleteOrderingDataFromUser(user.telegramID, order!._id);
