@@ -42,7 +42,6 @@ export interface Pool extends Document {
 }
 
 export interface AltToken extends Document {
-    _id: ObjectId;
     address: string;
     name: string;
     symbole: string;
@@ -67,6 +66,14 @@ const orderingDataSchema = new Schema<OrderingData>({
     state: String,
     dex: String
 });
+
+const altTokenSchema = new Schema<AltToken>({
+    address: String,
+    name: String,
+    symbole: String,
+    image: String,
+    dex: String,
+})
 
 const userSchema = new Schema<User>({
     telegramID: Number,
@@ -99,6 +106,7 @@ const poolSchema = new Schema<Pool>({
 // Define Mongoose models
 export const UserModel: Model<User> = mongoose.model<User>('User', userSchema);
 export const PoolModel: Model<Pool> = mongoose.model<Pool>('Pool', poolSchema);
+export const AltTokenModel: Model<AltToken> = mongoose.model<AltToken>('AltToken', altTokenSchema);
 //update user states
 export async function updateUserState(telegramID: number, newState: OrderingData): Promise<void> {
     await UserModel.updateOne({ telegramID }, { $set: { state: newState } });
@@ -180,8 +188,8 @@ export async function deletePoolsCollection(): Promise<void> {
     await PoolModel.deleteMany({});
 }
 // Create a new pool
-export async function createAltToken(altToken: AltToken): Promise<Pool> {
-    return PoolModel.create(altToken);
+export async function createAltToken(altToken: AltToken): Promise<AltToken> {
+    return AltTokenModel.create(altToken);
 }
 
 // Get a pool by caption
@@ -189,15 +197,15 @@ export async function getAltTokenWithAddress(
     address: string,
     dex: string
 ): Promise<AltToken | null> {
-    return PoolModel.findOne({ address, dex });
+    return AltTokenModel.findOne({ address, dex });
 }
 
 // Get all pools
 export async function getAltTokens(): Promise<AltToken[]> {
-    return PoolModel.find({});
+    return AltTokenModel.find({});
 }
 
 // Delete the pools collection
 export async function deleteAltTokensCollection(): Promise<void> {
-    await PoolModel.deleteMany({});
+    await AltTokenModel.deleteMany({});
 }

@@ -248,15 +248,22 @@ export async function getPriceStr(jettons: string[], mainId: number, dex: string
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export async function altTokenTableUpdate(dex: string){
     if (dex === 'dedust') {
-        let pools: any[] = await fetchDataGet('/pools', 'dedust');
-        pools.map(pool => {
+        let pools: any[] = ( await axios.get('https://api.dedust.io/v2/pools', {
+            headers: {
+                accept: 'application/json'
+            },
+            timeout: 100000000
+        })).data;
+        pools.forEach(async pool => {
             for (let i = 0; i < 2; i++) {
-                if (pool.assets[i]?.symbol !== 'TON') {
-                    const altToken = getAltTokenWithAddress(String(pool.assets[i]!.address), dex);
-                    if (!!!altToken) {
+                if (pool.assets[i]?.type !== 'native') {
+                    const altToken = await getAltTokenWithAddress(String(pool.assets[i]!.address), dex);
+                    if (!altToken) {
+                    console.log(pool.assets[i].address);
+
                         let metadata = pool.assets[i].metadata;
                         if (!!!metadata) {
-                            metadata = fetchDataGet(
+                            metadata = await fetchDataGet(
                                 `/jettons/${pool.assets[i].address}/metadata`,
                                 'dedust'
                             );
@@ -265,7 +272,8 @@ export async function altTokenTableUpdate(dex: string){
                             ...metadata,
                             dex: 'dedust'
                         };
-                        createAltToken(altToken);
+                        console.log(altToken)
+                        await createAltToken(altToken);
                     }
                 }
             }
