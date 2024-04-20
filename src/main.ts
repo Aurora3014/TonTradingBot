@@ -50,7 +50,8 @@ import { getStonPair } from './ston-fi/api';
 const startup = async () => {
     // console.log('=====> Loading Started');
     //  await altTokenTableUpdate('dedust');
-    await altTokenTableUpdate('ston');
+    
+    //await altTokenTableUpdate('dedust');
     await deletePoolsCollection();
     await getDedustPair();
     await getStonPair();
@@ -236,7 +237,7 @@ async function main(): Promise<void> {
                 if (user!.mode !== 'swap')
                     await bot.sendMessage(
                         query.message?.chat.id!,
-                        `🏃 Trading\n\n💡Please type in the valid Symbol`,
+                        `🏃 Trading\n\n💡Please type in the valid Symbol OR Try other DEX`,
                         {
                             reply_markup: {
                                 inline_keyboard: [
@@ -248,7 +249,7 @@ async function main(): Promise<void> {
                 else
                     await bot.sendMessage(
                         query.message?.chat.id!,
-                        `♻️ Instant Swap\n\n💡Please type in the valid Symbol`,
+                        `♻️ Instant Swap\n\n💡Please type in the valid Symbol OR Try other DEX`,
                         {
                             reply_markup: {
                                 inline_keyboard:[[
@@ -371,7 +372,7 @@ async function main(): Promise<void> {
                 if (user!.mode !== 'swap')
                     await bot.sendMessage(
                         msg.chat.id!,
-                        `🏃 Trading\n\n💡Please type in the valid Symbol`,
+                        `🏃 Trading\n\n💡Please type in the valid Symbol OR Try other DEX`,
                         {
                             reply_markup: {
                                 inline_keyboard: [
@@ -383,7 +384,7 @@ async function main(): Promise<void> {
                 else
                     await bot.sendMessage(
                         msg.chat.id!,
-                        `♻️ Instant Swap\n\n💡Please type in the valid Symbol`,
+                        `♻️ Instant Swap\n\n💡Please type in the valid Symbol OR Try other DEX`,
                         {
                             reply_markup: {
                                 inline_keyboard:[[
