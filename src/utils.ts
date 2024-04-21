@@ -1,9 +1,9 @@
 import { encodeTelegramUrlParameters, isTelegramUrl, WalletInfoRemote } from '@tonconnect/sdk';
-import { InlineKeyboardButton, Message } from 'node-telegram-bot-api';
+import TelegramBot, { InlineKeyboardButton, Message } from 'node-telegram-bot-api';
 import { bot } from './bot';
 import { fetchPrice, Jetton } from './dedust/api';
 import axios from 'axios';
-import { AltToken, createAltToken, getAltTokenWithAddress, getPoolWithCaption, Pool } from './ton-connect/mongo';
+import { AltToken, createAltToken, getAltTokenWithAddress, getPools, getPoolWithCaption, Pool, User } from './ton-connect/mongo';
 import mongoose from 'mongoose';
 
 export const AT_WALLET_APP_NAME = 'telegram-wallet';
@@ -297,7 +297,7 @@ export async function altTokenTableUpdate(dex: string){
                 const altTokenDB = await getAltTokenWithAddress(asset.contract_address, dex);
                 if (!!!altTokenDB){
                     let altToken: any = {
-                        address: asset.address,
+                        address: asset.contract_address,
                         symbol: asset.symbol,
                         name: asset.display_name,
                         decimals: asset.decimals,

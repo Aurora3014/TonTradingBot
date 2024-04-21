@@ -8,6 +8,7 @@ import {
     addTGReturnStrategy,
     buildUniversalKeyboard,
     fetchDataGet,
+    getPriceStr,
     pTimeout,
     pTimeoutException,
     replyMessage
@@ -21,9 +22,11 @@ import {
     getPoolWithCaption,
     getUserByTelegramID,
     OrderingData,
+    Pool,
     updateUserMode,
     updateUserState,
     updateWallet,
+    User,
     UserModel
 } from './ton-connect/mongo';
 import { mnemonicNew, mnemonicToPrivateKey } from '@ton/crypto';
@@ -182,13 +185,14 @@ async function handleTradingCallback(query: CallbackQuery, _: string) {
         for(const walletAssetItem of balances){
             if(walletAssetItem.asset.type != 'native'){
                 let asset = await getAltTokenWithAddress(walletAssetItem.asset.address, 'dedust');
+                if(asset == null) 
+                    asset = await getAltTokenWithAddress(walletAssetItem.asset.address, 'ston');
                 if(asset != null){
                     outputStr += asset!.name + ' : ' + (Number(walletAssetItem.balance) / 10 ** asset!.decimals) + ' ' + asset!.symbol + '\n';
                     if(buttons[Math.floor(counter/3)] == undefined)
                         buttons[Math.floor(counter/3)] = []
                     buttons[Math.floor(counter/3)]![counter % 3] = {text:asset!.symbol, callback_data: 'symbol-sell-' + asset!.address}
                     counter ++;
-
                 }
                 };
             }
@@ -361,8 +365,6 @@ Type /start to start your *Reward.tg* bot !  `,
                 ],
                 [{ text: '🔨 Tools and Settings', callback_data: 'setting' }],
                 [{ text: '🥇 Premium ( soon )', callback_data: 'seng' }]
-                //[{text:'🔗 Connect Your Wallet',callback_data:'walletConnect'},{text:'✂ Disconnect Wallet', callback_data:'disConnect'}],
-                //[{text:'📤 Deposit', callback_data:'deposit'},{text:'📥 Withdraw', callback_data:'withdraw'}],
             ]
         },
         parse_mode: 'Markdown'
@@ -426,7 +428,7 @@ export async function handleConnectCommand(msg: TelegramBot.Message): Promise<vo
             )}\n\n Disconnect wallet firstly to connect a new one`,{
                 reply_markup: {
                     inline_keyboard: [
-                        [{text:'<< Back', callback_data: 'newStart'}]
+                        [{text:'<< Back', callback_data: 'setting'}]
                     ]
                 }
             }
@@ -444,7 +446,7 @@ export async function handleConnectCommand(msg: TelegramBot.Message): Promise<vo
             await bot.sendPhoto(chatId, `🔗 Connect Wallet\n\n${walletName} wallet connected successfully`,{
                 reply_markup: {
                     inline_keyboard: [
-                        [{text:'<< Back', callback_data: 'newStart'}]
+                        [{text:'<< Back', callback_data: 'setting'}]
                     ]
                 }
             });
@@ -463,7 +465,7 @@ export async function handleConnectCommand(msg: TelegramBot.Message): Promise<vo
         reply_markup: {
             inline_keyboard: [
                 keyboard,
-                [{text:'<< Back', callback_data: 'newStart'}]
+                [{text:'<< Back', callback_data: 'setting'}]
             ]
         }
     });
@@ -579,7 +581,7 @@ export async function handleDisconnectCommand(msg: TelegramBot.Message): Promise
         await bot.sendMessage(chatId, "✂ Disconnect Wallet\n\n💡You didn't connect a wallet",{
             reply_markup: {
                 inline_keyboard: [
-                    [{text:'<< Back', callback_data: 'newStart'}]
+                    [{text:'<< Back', callback_data: 'setting'}]
                 ]
             }
         });
@@ -591,7 +593,7 @@ export async function handleDisconnectCommand(msg: TelegramBot.Message): Promise
     await bot.sendMessage(chatId, '✂ Disconnect Wallet\n\n💡Wallet has been disconnected',{
         reply_markup: {
             inline_keyboard: [
-                [{text:'<< Back', callback_data: 'newStart'}]
+                [{text:'<< Back', callback_data: 'setting'}]
             ]
         }
     });
@@ -600,7 +602,7 @@ export async function handleDisconnectCommand(msg: TelegramBot.Message): Promise
 export async function handleDepositCommand(query: CallbackQuery){
     const user = await getUserByTelegramID(query.message?.chat!.id!);
 
-    replyMessage(query.message!, `📤 Deposit\n\n💡Your RewardBot Wallet Address is \n<code>${user?.walletAddress}</code>`,[[{text:'<< Back', callback_data: 'newStart'}]])
+    replyMessage(query.message!, `📤 Deposit\n\n💡Your RewardBot Wallet Address is \n<code>${user?.walletAddress}</code>`,[[{text:'<< Back', callback_data: 'setting'}]])
 }
 
 export async function handleWithdrawCommand(query: CallbackQuery){
@@ -614,19 +616,25 @@ export async function handleWithdrawCommand(query: CallbackQuery){
     let outputStr = 'Toncoin : ' + (balances[0]?.balance ? (Number(balances[0]?.balance) / 1000000000) : '0') + ' TON\n';
     let buttons: InlineKeyboardButton[][] = [[{text:'TON', callback_data:'symbol-with-TON'}]];
     let counter = 0;
-    balances.map(async (walletAssetItem) => {
-        if(walletAssetItem.asset.type != 'native'){
-            let asset = await getAltTokenWithAddress(walletAssetItem.asset.address, 'dedust');
-                counter ++;
+    await (async () => {
+        for (const walletAssetItem of balances) {
+            if (walletAssetItem.asset.type !== 'native') {
+                let asset = await getAltTokenWithAddress(walletAssetItem.asset.address, 'dedust');
+                if (asset === null) {
+                    asset = await getAltTokenWithAddress(walletAssetItem.asset.address, 'ston');
+                }
+                counter++;
+                console.log(asset);
                 outputStr += asset!.name + ' : ' + (Number(walletAssetItem.balance) / 10 ** asset!.decimals) + ' ' + asset!.symbol + '\n';
-                if(buttons[Math.floor(counter/3)] == undefined)
-                    buttons[Math.floor(counter/3)] = []
-                buttons[Math.floor(counter/3)]![counter % 3] = {text:asset!.symbol, callback_data: 'symbol-with-' + asset!.symbol}
-            };
+                if (buttons[Math.floor((counter + 2) / 3) ] === undefined) {
+                    buttons[Math.floor((counter + 2) / 3) ] = [];
+                }
+                buttons[Math.floor((counter + 2) / 3)]![( counter + 2 ) % 3] = { text: asset!.symbol, callback_data: 'symbol-with-' + asset!.address };
+            }
         }
-    );
+    })();
     console.log(buttons)
-    buttons.push([{text:'<< Back', callback_data: 'newStart'}]);
+    buttons.push([{text:'<< Back', callback_data: 'setting'}]);
     bot.sendMessage(
         query.message!.chat.id,
         `📤 Withdraw\n\n💡Please click the coin's button to withdraw\nYou shuld have enough TON on this wallet to withdraw\n\n${outputStr}`,
@@ -635,23 +643,6 @@ export async function handleWithdrawCommand(query: CallbackQuery){
 }
 
 export async function handleShowMyWalletCommand(msg: TelegramBot.Message): Promise<void> {
-    // const chatId = msg.chat.id;
-
-    // const connector = getConnector(chatId);
-
-    // await connector.restoreConnection();
-    // if (!connector.connected) {
-    //     await bot.sendMessage(chatId, "You didn't connect a wallet");
-    //     return;
-    // }
-
-    // const walletName =
-    //     (await getWalletInfo(connector.wallet!.device.appName))?.name ||
-    //     connector.wallet!.device.appName;
-    // const address = toUserFriendlyAddress(
-    //     connector.wallet!.account.address,
-    //     connector.wallet!.account.chain === CHAIN.MAINNET,
-    // )
     console.log(msg);
 
     const user = await getUserByTelegramID(msg.chat!.id);
@@ -667,6 +658,9 @@ export async function handleShowMyWalletCommand(msg: TelegramBot.Message): Promi
             let asset = await getAltTokenWithAddress(walletAssetItem.asset.address, 'dedust');
             if(asset != null){
                 console.log('asdfasdfasdf',asset, walletAssetItem.asset.address, asset != null)
+                outputStr += asset!.name + ' : ' + (Number(walletAssetItem.balance) / 10 ** asset!.decimals) + ' ' + asset!.symbol + '\n';
+            } else {
+                asset = await getAltTokenWithAddress(walletAssetItem.asset.address, 'ston');
                 outputStr += asset!.name + ' : ' + (Number(walletAssetItem.balance) / 10 ** asset!.decimals) + ' ' + asset!.symbol + '\n';
             }
         }
@@ -700,9 +694,9 @@ export async function handleInstanteSwap(query: CallbackQuery): Promise<void> {
         updateUserMode(query.message?.chat.id!,"swap");
         updateUserState(query.message?.chat!.id!, user!.state);
 
-        //fetch assets from dedust API
-        const pools = await getPools();
-        const rows = Math.ceil(pools!.length / 4);
+        // fetch assets from dedust API
+        // const pools = await getPools();
+        // const rows = Math.ceil(pools!.length / 4);
 
         // let keyboardArray: InlineKeyboardButton[][] = []; // Type annotation for keyboardArray
         // const filteredAssets = pools!.filter(pool => pool !== undefined);
@@ -712,7 +706,7 @@ export async function handleInstanteSwap(query: CallbackQuery): Promise<void> {
         //     keyboardArray[Math.floor(index / 4)]![index % 4] = {text: caption, callback_data: `symbol-${caption}`};
         // });
         // keyboardArray.push([{text:'<< Back', callback_data: 'newStart'}]);
-        let text = `♻️ Instant Swap\n\n💡Please type in correct Jetton's Symbol/address\n\nFor example:\n🔸"jUSDT", NOT "jusdt" or "JUSDT"\n🔸"EQBynBO23yw ... STQgGoXwiuA"`;
+        let text = `♻️ Instant Swap\n\n💡Please type in correct Jetton's Symbol/address\n  Type in CA for new published tokens.\n\nFor example:\n🔸"jUSDT", NOT "jusdt" or "JUSDT"\n🔸"EQBynBO23yw ... STQgGoXwiuA"`;
         await bot.editMessageCaption(
             text,
             {
@@ -737,5 +731,152 @@ export async function handleInstanteSwap(query: CallbackQuery): Promise<void> {
             
     } catch (error) {
         console.log(error)
+    }
+}
+
+export async function handleJettonAmount( msg: TelegramBot.Message, user: User, is_input: boolean){
+    
+    await bot.sendMessage(msg.chat.id,  `🏃 Trading\n\n💡Processing`);
+
+    let clickedSymbol = Number( msg.text!.replace(',', '.'));
+    let state = user.state;
+        user.state.state = 'price';
+        if (state.isBuy || is_input) {
+            state.amount = Number(clickedSymbol);
+        } else {
+            const address = user.walletAddress;
+            const balances: walletAsset[] = await fetchDataGet(`/accounts/${address}/assets`, 'dedust');
+            // const assets: Jetton[] = await fetchDataGet('/assets', user!.mode);
+            balances.map(async walletAssetItem => {
+                if(walletAssetItem.asset.type != 'native')
+                    if (user!.state.jettons[1 - user!.state.mainCoin]!.length <= 10) {
+                        const asset = await getAltTokenWithAddress(walletAssetItem.asset.address, user!.mode);
+                        console.log(asset)
+                        if ( asset!.symbol === user?.state.jettons[1 - user.state.mainCoin] ) {
+                            state.amount =
+                                Number(walletAssetItem.balance) * clickedSymbol / 10 ** asset!.decimals * 100;
+                        }
+                        
+                    } else {
+                        if (
+                            walletAssetItem.asset.address ===
+                            user?.state.jettons[1 - user.state.mainCoin]
+                        ) {
+                            let matadata = await getAltTokenWithAddress(
+                                walletAssetItem.asset.address,
+                                'dedust'
+                            );
+                            state.amount =
+                                Number(
+                                    BigInt(walletAssetItem.balance) * BigInt(clickedSymbol)
+                                ) / Number(BigInt(10 ** matadata!.decimals * 100));
+                        }
+                    }
+            });
+        }
+        console.log(clickedSymbol, state.amount);
+        const strPrice = await getPriceStr(
+            user.state.jettons,
+            user.state.mainCoin,
+            user!.mode
+        );
+        let symbol;
+        if (user.state.jettons[1 - user.state.mainCoin]!.length >= 10) {
+            let metadata = await getAltTokenWithAddress(
+                user.state.jettons[1 - user.state.mainCoin]!,
+                'dedust'
+            );
+            symbol = metadata!.symbol;
+        } else symbol = user.state.jettons[1 - user.state.mainCoin];
+        await bot.sendMessage(
+            msg.chat.id!,
+            `🏃 Trading\n\n💡Input ${user.state.jettons[user.state.mainCoin]} Value for 1 ${
+                symbol
+            }\nWhen this value will meet for 1 ${
+                symbol
+            } bot will take order\nCurrent Price\n 1 ${symbol} = ${strPrice} ${user.state.jettons[user.state.mainCoin]}`,
+        {
+            reply_markup:{
+                inline_keyboard:[[ {text:'<< Back', callback_data: 'symbol-selectdex'} ]]
+            }
+        });
+}
+
+export async function handleJettonTypeSelect (msg: TelegramBot.Message, user:User, tokenAddressOrName: string){
+    let typedSymbol = '',
+        otherSymbol = '';
+    //name, symbol, address => symbol
+    const assets: Pool[] = await getPools();
+    if (assets)
+        assets.map(asset => {
+            if (
+                asset.assets[1 - asset.main]!.toUpperCase() === tokenAddressOrName.toUpperCase() ||
+                (asset.caption[1 - asset.main]! === tokenAddressOrName && asset.dex === 'ston')
+            ) {
+                typedSymbol = 'TON/' + asset.caption[1 - asset.main]!;
+                otherSymbol = asset.caption[1 - asset.main]! + '/TON';
+                return;
+            }
+        });
+    let selectedPool = await getPoolWithCaption(typedSymbol.split('/'), user!.mode)!;
+    if (!selectedPool)
+        selectedPool = await getPoolWithCaption(otherSymbol.split('/'), user!.mode)!;
+    
+    console.log(typedSymbol, otherSymbol, user!.mode);
+    if (!selectedPool) {
+        if (user!.mode !== 'swap')
+            await bot.sendMessage(
+                msg?.chat.id!,
+                `🏃 Trading\n\n💡Please type in the valid Symbol OR Try other DEX`,
+                {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '<< Back', callback_data: 'symbol-selectdex' }]
+                        ]
+                    }
+                }
+            );
+        else
+            await bot.sendMessage(
+                msg?.chat.id!,
+                `♻️ Instant Swap\n\n💡Please type in the valid Symbol OR Try other DEX`,
+                {
+                    reply_markup: {
+                        inline_keyboard:[[
+                            {text:'<< Back', callback_data: 'instanteSwap'}
+                        ]] 
+                    }
+                });
+        return;
+    }
+    user!.state.jettons = selectedPool.caption;
+    user!.state.mainCoin = selectedPool!.main;
+    let state = user!.state;
+    state.state = 'isBuy';
+    if (state.isBuy) {
+        await bot.sendMessage(msg?.chat.id!,  `🏃 Trading\n\n💡Please input or click amount button of jetton in ` + state.jettons[state.mainCoin],
+            {
+                reply_markup:{
+                    inline_keyboard:[
+                        [ {text:'Buy 0.1 TON', callback_data: 'symbol-0.1'},{text:'Buy 0.3 TON', callback_data: 'symbol-0.3'} ],
+                        [ {text:'Buy 0.5 TON', callback_data: 'symbol-0.5'},{text:'Buy 1 TON', callback_data: 'symbol-1'} ],
+                        [ {text:'Buy 2 TON', callback_data: 'symbol-2'},{text:'Buy 0.0001 TON', callback_data: 'symbol-0.0001'} ],
+                        [ {text:'<< Back', callback_data: 'symbol-selectdex'} ]
+                    ]
+                }
+            });
+    }
+    else {
+        await bot.sendMessage(msg?.chat.id!,  `🏃 Trading\n\n💡Please input or click amount button of jetton what you want to sell `,
+            {
+                reply_markup:{
+                    inline_keyboard:[
+                        [ {text:'Sell 5%', callback_data: 'symbol-5'},{text:'Sell 10%', callback_data: 'symbol-10'} ],
+                        [ {text:'Sell 20%', callback_data: 'symbol-20'},{text:'Sell 30%', callback_data: 'symbol-30'} ],
+                        [ {text:'Sell 50%', callback_data: 'symbol-50'},{text:'Sell 100%', callback_data: 'symbol-100'} ],
+                        [ {text:'<< Back', callback_data: 'symbol-selectdex'} ]
+                    ]
+                }
+            });
     }
 }
