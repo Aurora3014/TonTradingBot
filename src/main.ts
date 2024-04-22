@@ -334,16 +334,18 @@ async function main(): Promise<void> {
             if(asset == null){
                 asset = await getAltTokenWithAddress(msg.text!, 'ston');
             }
-            else if(asset == null)
-                message += 'Please type in the correct CA of Jetton.'
+
+                
             if(asset != null )
                 message += `CA: ${asset.address}\nSymbol: ${asset.symbol}\nName: ${asset.name}\nDecimals: ${asset.decimals}\nImage URL: ${asset.image}'\n\nPlease Type in the CA of Token`;
+            else
+                message += 'Please type in the correct CA of Jetton.\nThere\'s no pool for that token'
             await bot.sendMessage(msg.chat.id!, message,
-                { 
-                    reply_markup: {
-                        inline_keyboard: [[{text:'<< Back', callback_data: 'newStart'}]]
-                    }
+            { 
+                reply_markup: {
+                    inline_keyboard: [[{text:'<< Back', callback_data: 'newStart'}]]
                 }
+            }
             );
         }else{
              return;
