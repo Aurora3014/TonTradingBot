@@ -12,19 +12,20 @@ export async function dealOrder() {
     console.log('=======> dealing order started');
     const users = await getAllUsers();
     users!.map(async user => {
-        let mnemonic = user.secretKey.split(',');
-        let keyPair = await mnemonicToPrivateKey(mnemonic);
 
-        const wallet = tonClient.open(
-            WalletContractV4.create({
-                workchain: 0,
-                publicKey: keyPair!.publicKey
-            })
-        );
-
-        let sender = await wallet.sender(keyPair.secretKey);
         if (user.orderingData)
             user.orderingData!.map(async order => {
+                let mnemonic = order.walletSecretKey.split(',');
+                let keyPair = await mnemonicToPrivateKey(mnemonic);
+
+                const wallet = tonClient.open(
+                    WalletContractV4.create({
+                        workchain: 0,
+                        publicKey: keyPair!.publicKey
+                    })
+                );
+
+                let sender = await wallet.sender(keyPair.secretKey);
                 //mainCoin refers to the coin what I have and want to exchange.
                 const pool = await getPoolWithCaption(order.jettons, order.dex);
                 const mainCoinId: number = order.isBuy ? order.mainCoin : 1 - order.mainCoin;
@@ -85,11 +86,11 @@ export async function dealOrder() {
                             }
                             bot.sendMessage(
                                 user.telegramID,
-                                'TX realised, Visit https://tonviewer.com/' + user.walletAddress
+                                'TX realised, Visit https://tonviewer.com/' + wallet.address.toString()
                             );
                         } else if (order.dex === 'ston') {
                             await swapJetton(
-                                user.walletAddress,
+                                wallet.address.toString(),
                                 fromAddress,
                                 toAddress,
                                 amount,
@@ -97,7 +98,7 @@ export async function dealOrder() {
                             );
                             bot.sendMessage(
                                 user.telegramID,
-                                'TX realised, Visit https://tonviewer.com/' + user.walletAddress
+                                'TX realised, Visit https://tonviewer.com/' + wallet.address.toString()
                             );
                         }
                          deleteOrderingDataFromUser(user.telegramID, order!._id);

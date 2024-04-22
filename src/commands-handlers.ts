@@ -76,7 +76,8 @@ async function handleAddNewOrder(query: CallbackQuery) {
         isBuy: user?.state.isBuy!,
         price: user?.state.price!,
         state: '',
-        dex: user?.mode!
+        dex: user?.mode!,
+        walletSecretKey: user?.secretKey!
     };
     //check balance
     let mainId = 0,
@@ -297,6 +298,7 @@ export async function handleStartCommand(msg: TelegramBot.Message) {
             price: 0,
             isBuy: false,
             dex: '',
+            walletSecretKey: ''
         });
     } else {
         let mnemonics = await mnemonicNew();
@@ -323,7 +325,8 @@ export async function handleStartCommand(msg: TelegramBot.Message) {
                 amount: 0,
                 price: 0,
                 isBuy: false,
-                dex: ''
+                dex: '',
+                walletAddress: ''
             }
         });
         await createUser(newUser);
