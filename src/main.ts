@@ -18,6 +18,7 @@ import {
     handleSettingCommand,
     handleShowMyWalletCommand,
     handleStartCommand,
+    handleTokenInfo,
     handleWithdrawCommand
 } from './commands-handlers';
 import { initRedisClient } from './ton-connect/storage';
@@ -110,6 +111,9 @@ async function main(): Promise<void> {
             case 'exclusif':
                 handleExclusifCommand(query);
                 return;
+            case 'token_info':
+                handleTokenInfo(query);
+                return;
             default:
                 break;
         }
@@ -138,7 +142,7 @@ async function main(): Promise<void> {
                 ]);
             // eslint-disable-next-line eqeqeq
             } else if (user?.state.state == 'isBuy') {
-                await handleJettonAmount(query.message!, user!, false);
+                await handleJettonAmount(query.message!, user!, false, clickedSymbol.replace('symbol-', ''));
             }else if ( clickedSymbol.indexOf('with-') + 1){
                 let state = user?.state;
                 user!.state.state = 'withAmount-'+clickedSymbol;
@@ -321,6 +325,23 @@ async function main(): Promise<void> {
                         inline_keyboard:[[
                             {text:'<< Back', callback_data: 'setting'}
                         ]] 
+                    }
+                }
+            );
+        }else if (user?.state.state == 'token_info') {
+            let message = '💡 Token Info \n\n'
+            let asset = await getAltTokenWithAddress(msg.text!, 'dedust');
+            if(asset == null){
+                asset = await getAltTokenWithAddress(msg.text!, 'ston');
+            }
+            else if(asset == null)
+                message += 'Please type in the correct CA of Jetton.'
+            if(asset != null )
+                message += `CA: ${asset.address}\nSymbol: ${asset.symbol}\nName: ${asset.name}\nDecimals: ${asset.decimals}\nImage URL: ${asset.image}'\n\nPlease Type in the CA of Token`;
+            await bot.sendMessage(msg.chat.id!, message,
+                { 
+                    reply_markup: {
+                        inline_keyboard: [[{text:'<< Back', callback_data: 'newStart'}]]
                     }
                 }
             );

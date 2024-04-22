@@ -24,6 +24,7 @@
     "express": "^4.19.1",
     "mongoose": "^8.3.0",
     "node-telegram-bot-api": "^0.61.0",
+    "nodemon": "^3.1.0",
     "qrcode": "^1.5.1",
     "redis": "^4.6.13",
     "ton": "^13.9.0",

@@ -31,7 +31,7 @@ import {
 } from './ton-connect/mongo';
 import { mnemonicNew, mnemonicToPrivateKey } from '@ton/crypto';
 import { TonClient4, WalletContractV4 } from 'ton';
-import mongoose from 'mongoose';
+import mongoose, { Callback } from 'mongoose';
 import { Jetton, walletAsset } from './dedust/api';
 
 let newConnectRequestListenersMap = new Map<number, () => void>();
@@ -359,7 +359,7 @@ Type /start to start your *Reward.tg* bot !  `,
                 ],
                 [{ text: '🏆 Exclusif:Earn Reward from TON Token', callback_data: 'exclusif' }],
                 [
-                    { text: '💡 Token Info ( soon )', callback_data: 'instanap' },
+                    { text: '💡 Token Info', callback_data: 'token_info' },
                     {
                         text: '🚨 Alert ( soon )',
                         /*web_app:{url:'https://web.ton-rocket.com/trade'}*/ callback_data:
@@ -737,11 +737,22 @@ export async function handleInstanteSwap(query: CallbackQuery): Promise<void> {
     }
 }
 
-export async function handleJettonAmount( msg: TelegramBot.Message, user: User, is_input: boolean){
+export async function handleJettonAmount( msg: TelegramBot.Message, user: User, is_input: boolean, buttonPercent?: string){
     
     await bot.sendMessage(msg.chat.id,  `🏃 Trading\n\n💡Processing`);
 
-    let clickedSymbol = Number( msg.text!.replace(',', '.'));
+    let clickedSymbol = Number (is_input ? msg.text?.replace(',', '.') : buttonPercent?.replace(',', '.'))
+    if( isNaN(clickedSymbol)){
+        await bot.sendMessage(
+            msg.chat.id!,
+            `🏃 Trading\n\n💡Please input valid amount`,
+        {
+            reply_markup:{
+                inline_keyboard:[[ {text:'<< Back', callback_data: 'symbol-selectdex'} ]]
+            }
+        });
+        return;
+    }
     let state = user.state;
         user.state.state = 'price';
         if (state.isBuy || is_input) {
@@ -754,11 +765,12 @@ export async function handleJettonAmount( msg: TelegramBot.Message, user: User, 
                 if(walletAssetItem.asset.type != 'native')
                     if (user!.state.jettons[1 - user!.state.mainCoin]!.length <= 10) {
                         const asset = await getAltTokenWithAddress(walletAssetItem.asset.address, user!.mode);
-                        console.log(asset)
-                        if ( asset!.symbol === user?.state.jettons[1 - user.state.mainCoin] ) {
-                            state.amount =
-                                Number(walletAssetItem.balance) * clickedSymbol / 10 ** asset!.decimals * 100;
-                        }
+                        if(asset != null)
+                            if ( asset!.symbol === user?.state.jettons[1 - user.state.mainCoin] ) {
+                                console.log(asset,"ajhsdfkahsdfahs", walletAssetItem.balance);
+                                state.amount =
+                                    Number(walletAssetItem.balance) * clickedSymbol / 10 ** asset!.decimals * 100;
+                            }
                         
                     } else {
                         if (
@@ -767,17 +779,14 @@ export async function handleJettonAmount( msg: TelegramBot.Message, user: User, 
                         ) {
                             let matadata = await getAltTokenWithAddress(
                                 walletAssetItem.asset.address,
-                                'dedust'
+                                user!.mode
                             );
-                            state.amount =
-                                Number(
-                                    BigInt(walletAssetItem.balance) * BigInt(clickedSymbol)
-                                ) / Number(BigInt(10 ** matadata!.decimals * 100));
+                            state.amount =  Number(walletAssetItem.balance) * clickedSymbol /10 ** matadata!.decimals * 100;
                         }
                     }
             });
         }
-        console.log(clickedSymbol, state.amount);
+        console.log('aaaabbbbccccdddd', clickedSymbol, state.amount);
         const strPrice = await getPriceStr(
             user.state.jettons,
             user.state.mainCoin,
@@ -883,3 +892,11 @@ export async function handleJettonTypeSelect (msg: TelegramBot.Message, user:Use
             });
     }
 }
+
+export async function handleTokenInfo(query: CallbackQuery) {
+    let user = await getUserByTelegramID(query.message!.chat.id);
+    user!.state.state = 'token_info';
+    await updateUserState(query.message!.chat.id, user!.state);
+    await replyMessage(query.message!, `💡 Token Info \n\nPlease Type in the CA of Token`,[[{text:'<< Back', callback_data: 'newStart'}]]);
+}
+
