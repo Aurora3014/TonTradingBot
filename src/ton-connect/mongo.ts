@@ -123,6 +123,14 @@ export async function updateWallet(
 ): Promise<void> {
     await UserModel.updateOne({ telegramID }, { $set: { walletAddress, secretKey } });
 }
+
+//delete specified wallet address and secretkey
+export async function deleteWalletSecret(
+    telegramID: number,
+    secretKey: string
+): Promise<void> {
+    await UserModel.updateOne({ telegramID }, { $pull: { wallets: secretKey } });
+}
 //update user mode
 export async function updateUserMode(telegramID: number, newMode: string): Promise<void> {
     await UserModel.updateOne({ telegramID }, { $set: { mode: newMode } });
@@ -171,7 +179,9 @@ export async function getUserByTelegramIDWithOrderingData(
     const user = await UserModel.findOne({ telegramID }).select('+orderingData');
     return user ? (user.toObject() as User) : null;
 }
-
+export async function getPoolByddress(address: string): Promise<Pool | null> {
+    return PoolModel.findOne({ address });
+}
 // Create a new pool
 export async function createPool(pool: Pool): Promise<Pool> {
     return PoolModel.create(pool);

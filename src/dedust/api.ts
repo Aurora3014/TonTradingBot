@@ -7,7 +7,7 @@ import { Asset, PoolType, ReadinessStatus, JettonRoot } from '@dedust/sdk';
 import axios from 'axios';
 import { mnemonicToPrivateKey, mnemonicToWalletKey } from '@ton/crypto';
 import { delay, fetchDataGet } from '../utils';
-import { Pool, createPool } from '../ton-connect/mongo';
+import { Pool, createPool, getPoolByddress } from '../ton-connect/mongo';
 
 const tonClient = new TonClient4({ endpoint: 'https://mainnet-v4.tonhubapi.com' });
 const factory = tonClient.open(Factory.createFromAddress(MAINNET_FACTORY_ADDR));
@@ -268,12 +268,7 @@ function checkHaveTrendingCoin(pool: Pool) {
 }
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export async function getDedustPair() {
-    // eslint-disable-next-line unused-imports/no-unused-vars
-    let counter = 0;
-    //fetch data
-    // eslint-disable-next-line unused-imports/no-unused-vars
-    const extPrice: { symbol: string; price: number }[] = await fetchDataGet('/prices', 'dedust');
-    //TON price
+  
     let pools: Pool[] = await fetchDataGet('/pools', 'dedust');
     let limit = 100;
     pools = pools.filter(
@@ -286,8 +281,15 @@ export async function getDedustPair() {
     await Promise.all(
         // eslint-disable-next-line prettier/prettier
         pools.map(async (pool) => {
-            pool.main = checkHaveTrendingCoin(pool);
-            await createPool(pool);
+            const dbPool = await getPoolByddress(pool.address);
+            if(dbPool == null){
+                //////// NEW POOL FOUND ///////
+                pool.main = checkHaveTrendingCoin(pool);
+                console.log("===> new POOL <===")
+                console.log(pool)
+                await createPool(pool);
+            }
+
         })
     );
     return;

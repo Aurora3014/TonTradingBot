@@ -259,7 +259,7 @@ export async function altTokenTableUpdate(dex: string){
             for (let i = 0; i < 2; i++) {
                 if (pool.assets[i]?.type !== 'native') {
                     const altToken = await getAltTokenWithAddress(String(pool.assets[i]!.address), dex);
-                    if (!!!altToken) {
+                    if (altToken == null) {
                     console.log(pool.assets[i].address);
                     try {
                         let metadata = pool.assets[i].metadata;
@@ -295,7 +295,7 @@ export async function altTokenTableUpdate(dex: string){
             console.log(assets)
             for (const asset of assets) {
                 const altTokenDB = await getAltTokenWithAddress(asset.contract_address, dex);
-                if (!!!altTokenDB){
+                if (altTokenDB == null){
                     let altToken: any = {
                         address: asset.contract_address,
                         symbol: asset.symbol,

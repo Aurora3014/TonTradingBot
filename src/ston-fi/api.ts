@@ -2,7 +2,7 @@ import TonWeb from 'tonweb';
 
 import { Router, ROUTER_REVISION, ROUTER_REVISION_ADDRESS } from '@ston-fi/sdk';
 import { mnemonicToWalletKey } from '@ton/crypto';
-import { Pool, createPool } from '../ton-connect/mongo';
+import { Pool, createPool, getPoolByddress } from '../ton-connect/mongo';
 import { fetchDataGet } from '../utils';
 import { Jetton } from '../dedust/api';
 import { toNano } from 'ton-core';
@@ -125,67 +125,57 @@ function checkHaveTrendingCoin(pool: Pool){
 }
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export async function getStonPair() {
-    // eslint-disable-next-line unused-imports/no-unused-vars
-    let counter = 0;
-    //fetch data
     const assets: Jetton[] = await fetchDataGet('/assets', 'ston');
-
-    // eslint-disable-next-line unused-imports/no-unused-vars
-    const extPrice: { symbol: string; price: number }[] = await fetchDataGet('/prices', 'dedust');
-    //TON price
     let pools: Pool[] = await fetchDataGet('/pools', 'ston');
-    console.log(typeof pools);
     pools = pools.filter(
         pool => checkHaveTrendingCoin(pool) >= 0 && pool!.reserves![0]! > toNano(100)
     );
-    pools.sort((a, b) => {
-        return b.totalSupply - a.totalSupply;
-    });
+    // pools.sort((a, b) => {
+    //     return b.totalSupply - a.totalSupply;
+    // });
     await Promise.all(
         pools.map(async (pool, index) => {
-            pool.caption = ['', ''];
-            pool.prices = [0, 0];
-            pool.TVL = 0;
-            pool.decimals = [0, 0];
-            let flag = true;
-            for (let i = 0; i < 2; i++) {
-                try {
-                    const filteredAssets = assets.filter(
-                        asset => asset.address === pool.assets[i]?.replace('jetton:', '')
-                    );
-                    let decimals = 0;
-                    if (filteredAssets.length !== 0 || pool.assets[i] === 'native') {
-                        if (pool.assets[i] === 'native') {
-                            pool.caption[i] = 'TON';
-                            decimals = 9;
+            const dbPool = await getPoolByddress(pool.address);
+            //////// NEW POOL FOUND ///////
+            if(dbPool == null){
+                pool.caption = ['', ''];
+                pool.prices = [0, 0];
+                pool.TVL = 0;
+                pool.decimals = [0, 0];
+                let flag = true;
+                for (let i = 0; i < 2; i++) {
+                    try {
+                        const filteredAssets = assets.filter(
+                            asset => asset.address === pool.assets[i]?.replace('jetton:', '')
+                        );
+                        let decimals = 0;
+                        if (filteredAssets.length !== 0 || pool.assets[i] === 'native') {
+                            if (pool.assets[i] === 'native') {
+                                pool.caption[i] = 'TON';
+                                decimals = 9;
+                            } else {
+                                pool.caption[i] = filteredAssets[0]!.symbol;
+                                decimals = filteredAssets[0]?.decimals!;
+                            }
+                            pool.decimals[i] = decimals;
                         } else {
-                            pool.caption[i] = filteredAssets[0]!.symbol;
-                            decimals = filteredAssets[0]?.decimals!;
-                        } //init caption
-                        // const pricePost = await fetchPrice(10 ** decimals * 1000000,  pool.assets[i]!, 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' );
-                        pool.decimals[i] = decimals;
-                        // const price = pricePost * nativePrice / 10 ** 6 /1000000;
-                        // pool.prices[i] = Number(price < 1? price.toPrecision(9):price)  // price in USD
-                        // if(pool.assets[i] == 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA')
-                        // pool.prices[i] = nativePrice;
-                        //pool.TVL += (pool.prices[i]! * pool.reserves[i]!);
-                    } else {
-                        flag = false;
+                            flag = false;
+                        }
+                    } catch (error) {
+                        // eslint-disable-next-line no-console
+                        console.log(`Error in async operation for pool ${index} , asset ${i}:`, error);
+                        continue;
                     }
-                } catch (error) {
-                    // eslint-disable-next-line no-console
-                    console.log(`Error in async operation for pool ${index}, asset ${i}:`, error);
-                    counter++;
-                    continue;
                 }
-            }
-            pool.main = checkHaveTrendingCoin(pool);
-            counter++;
-            if (flag) {
-                try {
-                    await createPool(pool); // 5000 milliseconds (5 seconds) timeout
-                } catch (error) {
-                    console.error('Error creating pool:', error);
+                pool.main = checkHaveTrendingCoin(pool);
+                if (flag) {
+                    try {
+                        await createPool(pool); // 5000 milliseconds (5 seconds) timeout
+                        console.log("===> new POOL <===")
+                        console.log(pool)
+                    } catch (error) {
+                        console.error('Error creating pool:', error);
+                    }
                 }
             }
         })

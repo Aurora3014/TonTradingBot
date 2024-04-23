@@ -17,6 +17,7 @@ import {
     addNewWalletToUser,
     addOrderingDataToUser,
     createUser,
+    deleteWalletSecret,
     getAltTokenWithAddress,
     getPools,
     getPoolWithCaption,
@@ -42,7 +43,10 @@ export const commandCallback = {
     addNewOrder: handleAddNewOrder,
     addNewWallet: handleAddNewWallet,
     walletSelect: handleWalletSelect,
-    selectPair: handleSelectPair
+    selectPair: handleSelectPair,
+    walletDelete: handleWalletDelete,
+    activateWallet:handleWalletActivate,
+    deleteWallet:handleWalletDelete
 }
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 async function handleSelectPair(query: CallbackQuery, _: string) {
@@ -357,7 +361,7 @@ Type /start to start your *Reward.tg* bot !  `,
                             'symbol-selectdex'
                     }
                 ],
-                [{ text: '🏆 Exclusif:Earn Reward from TON Token', callback_data: 'exclusif' }],
+                [{ text: '🏆 Exclusif:Earn Reward in TON Token', callback_data: 'exclusif' }],
                 [
                     { text: '💡 Token Info', callback_data: 'token_info' },
                     {
@@ -380,7 +384,19 @@ export async function handleAddNewWallet(query: CallbackQuery): Promise<void> {
     await handleShowMyWalletCommand(query.message!);
 }
 
-export async function handleWalletSelect(query: CallbackQuery, _: string): Promise<void> {
+export async function handleWalletDelete(query: CallbackQuery, _:string): Promise<void> {
+    //change current wallet 
+    const user = await getUserByTelegramID(query.message?.chat.id!);
+
+    await deleteWalletSecret( query.message?.chat.id!,
+        user!.wallets[Number(_)]!
+    );
+    //view refresh
+    await handleShowMyWalletCommand(query.message!)
+}
+
+export async function handleWalletActivate(query: CallbackQuery, _:string): Promise<void> {
+    //change current wallet 
     const user = await getUserByTelegramID(query.message?.chat.id!);
     let mnemonic = user!.wallets[Number(_)]!.split(',')
     let keyPair = await mnemonicToPrivateKey(mnemonic);
@@ -391,13 +407,55 @@ export async function handleWalletSelect(query: CallbackQuery, _: string): Promi
             publicKey: keyPair!.publicKey
         })
     );
-    console.log(mnemonic);
-    console.log(wallet.address.toString());
     await updateWallet( query.message?.chat.id!,
         wallet.address.toString(),
         user!.wallets[Number(_)]!
     );
+    //view refresh
     await handleShowMyWalletCommand(query.message!)
+}
+
+export async function handleWalletSelect(query: CallbackQuery, _: string): Promise<void> {
+
+    const user = await getUserByTelegramID(query.message?.chat!.id!);
+    let currentIndex = Number(_);
+    let mnemonic = user!.wallets[currentIndex]!.split(',')
+    let keyPair = await mnemonicToPrivateKey(mnemonic);
+
+    const wallet = tonClient.open(
+        WalletContractV4.create({
+            workchain: 0,
+            publicKey: keyPair!.publicKey
+        })
+    );
+    const address = wallet.address.toString();
+    const balances: walletAsset[] = await fetchDataGet(`/accounts/${address}/assets`, 'dedust');
+    // const assets: Jetton[] = await fetchDataGet('/assets', 'ston');
+    console.log(balances);
+    let outputStr = '\nToncoin : ' + (balances[0]?.balance ? (Number(balances[0]?.balance) / 1000000000) : '0') + ' TON\n\n<b>-ALT TOKEN</b>\n';
+
+    for(const walletAssetItem of balances)  {
+        if(walletAssetItem.asset.type != 'native'){
+            let asset = await getAltTokenWithAddress(walletAssetItem.asset.address, 'dedust');
+            if(asset != null){
+                console.log('asdfasdfasdf',asset, walletAssetItem.asset.address, asset != null)
+                outputStr += asset!.name + ' : ' + (Number(walletAssetItem.balance) / 10 ** asset!.decimals) + ' ' + asset!.symbol + '\n';
+            } else {
+                asset = await getAltTokenWithAddress(walletAssetItem.asset.address, 'ston');
+                outputStr += asset!.name + ' : ' + (Number(walletAssetItem.balance) / 10 ** asset!.decimals) + ' ' + asset!.symbol + '\n';
+            }
+        }
+    };
+    await replyMessage(query.message!,
+        `💵 My wallet ${currentIndex}\n\nYour RewardBot Wallet address:\n <code>${address}</code>\n ${String(outputStr)}`,
+        [
+            [
+                {text: 'Activate', callback_data: JSON.stringify({method: 'activateWallet', data:_})}, 
+                {text:'Delete', callback_data: JSON.stringify({method: 'deleteWallet', data:_})}
+            ],
+            [{text:'back', callback_data:'showMyWallet'}]
+        ] 
+    )
 }
 export async function handleExclusifCommand(query: CallbackQuery): Promise<void> {
     bot.sendMessage(
@@ -769,7 +827,7 @@ export async function handleJettonAmount( msg: TelegramBot.Message, user: User, 
                             if ( asset!.symbol === user?.state.jettons[1 - user.state.mainCoin] ) {
                                 console.log(asset,"ajhsdfkahsdfahs", walletAssetItem.balance);
                                 state.amount =
-                                    Number(walletAssetItem.balance) * clickedSymbol / 10 ** asset!.decimals * 100;
+                                    Number(walletAssetItem.balance) * clickedSymbol / 10 ** asset!.decimals / 100;
                             }
                         
                     } else {
@@ -781,7 +839,7 @@ export async function handleJettonAmount( msg: TelegramBot.Message, user: User, 
                                 walletAssetItem.asset.address,
                                 user!.mode
                             );
-                            state.amount =  Number(walletAssetItem.balance) * clickedSymbol /10 ** matadata!.decimals * 100;
+                            state.amount =  Number(walletAssetItem.balance) * clickedSymbol /10 ** matadata!.decimals / 100;
                         }
                     }
             });

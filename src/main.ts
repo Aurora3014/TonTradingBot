@@ -28,6 +28,7 @@ import {
     connect,
     deleteOrderingDataFromUser,
     deletePoolsCollection,
+    deleteWalletSecret,
     getAltTokenWithAddress,
     getAltTokenWithSymbol,
     getAltTokens,
@@ -52,10 +53,10 @@ import { getStonPair } from './ston-fi/api';
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 const startup = async () => {
     console.log('=====> Loading Started');
-    // await altTokenTableUpdate('dedust');
+    await altTokenTableUpdate('dedust');
     
-    //await altTokenTableUpdate('ston');
-    await deletePoolsCollection();
+    await altTokenTableUpdate('ston');
+    // await deletePoolsCollection();
     await getDedustPair();
     await getStonPair();
     console.log('=====> Loading Finished')
@@ -114,6 +115,7 @@ async function main(): Promise<void> {
             case 'token_info':
                 handleTokenInfo(query);
                 return;
+           
             default:
                 break;
         }
