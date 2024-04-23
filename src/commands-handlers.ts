@@ -46,7 +46,9 @@ export const commandCallback = {
     selectPair: handleSelectPair,
     walletDelete: handleWalletDelete,
     activateWallet:handleWalletActivate,
-    deleteWallet:handleWalletDelete
+    deleteWallet:handleWalletDelete,
+    addNewWalletConfirm: handleAddNewWalletConfirm,
+    transferToken: handleTransferToken
 }
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 async function handleSelectPair(query: CallbackQuery, _: string) {
@@ -704,7 +706,6 @@ export async function handleWithdrawCommand(query: CallbackQuery){
 }
 
 export async function handleShowMyWalletCommand(msg: TelegramBot.Message): Promise<void> {
-    console.log(msg);
 
     const user = await getUserByTelegramID(msg.chat!.id);
 
@@ -727,7 +728,10 @@ export async function handleShowMyWalletCommand(msg: TelegramBot.Message): Promi
         }
     };
     let currentIndex = 0;
-    let walletBtns: InlineKeyboardButton[][] = [[{text: "Add New Wallet", callback_data: JSON.stringify({method:"addNewWallet"})}]];
+    let walletBtns: InlineKeyboardButton[][] = [
+        [{text: "Transfer", callback_data: JSON.stringify({method:"transferToken"})}],
+        [{text: "Add New Wallet", callback_data: JSON.stringify({method:"addNewWalletConfirm"})}],
+    ];
     user?.wallets.map((secret, index) => {
         let emoji = '';
         if(secret == user.secretKey) {
@@ -735,9 +739,9 @@ export async function handleShowMyWalletCommand(msg: TelegramBot.Message): Promi
         currentIndex = index;
         emoji = '⭐';
     }
-        if(!walletBtns[index + 1]) walletBtns[Math.floor((index + 1))] = [];
+        if(!walletBtns[index + 2]) walletBtns[Math.floor((index + 2))] = [];
         let temp = secret;
-        walletBtns[index + 1] = [{text:emoji + "Wallet " + index + emoji, callback_data:JSON.stringify({method:'walletSelect',data:index})}]
+        walletBtns[index + 2] = [{text:emoji + "Wallet " + index + emoji, callback_data:JSON.stringify({method:'walletSelect',data:index})}]
     })
     walletBtns.push([{text:'<< Back', callback_data: 'newStart'}])
     console.log(outputStr)
@@ -746,6 +750,21 @@ export async function handleShowMyWalletCommand(msg: TelegramBot.Message): Promi
         `💵 My wallet ${currentIndex}\n\nYour RewardBot Wallet address:\n <code>${address}</code>\n ${String(outputStr)}`,
         walletBtns
     )
+}
+
+
+export async function handleAddNewWalletConfirm(query: CallbackQuery){
+    await replyMessage(query.message!,  
+        `💵 Add New Wallet\n\nDo you really want to add a new wallet?`,
+        [
+            [
+                {text:'🟢Yes', callback_data: JSON.stringify({method: 'addNewWallet'})},
+                {text:'🔴No', callback_data: 'showMyWallet'},
+            ],
+            [
+                {text:'<< Back', callback_data: 'showMyWallet'},
+            ]
+        ])
 }
 
 export async function handleInstanteSwap(query: CallbackQuery): Promise<void> {
@@ -957,4 +976,12 @@ export async function handleTokenInfo(query: CallbackQuery) {
     await updateUserState(query.message!.chat.id, user!.state);
     await replyMessage(query.message!, `💡 Token Info \n\nPlease Type in the CA of Token`,[[{text:'<< Back', callback_data: 'newStart'}]]);
 }
-
+export async function handleTransferToken(query: CallbackQuery) {
+    const user = await getUserByTelegramID(query.message!.chat!.id);
+    user!.state.state = 'getTargetAddress';
+    await updateUserState(query.message!.chat!.id, user!.state);
+    await replyMessage( query.message!, 
+        `💸 Transfer\n\nPlease type in the target wallet address`,
+        [[{ text: '<< Back', callback_data: 'showMyWallet' }]]
+    )
+}

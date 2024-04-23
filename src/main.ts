@@ -38,7 +38,7 @@ import {
     updateUserState
 } from './ton-connect/mongo';
 import { commandCallback } from './commands-handlers';
-import TelegramBot from 'node-telegram-bot-api';
+import TelegramBot, { InlineKeyboardButton } from 'node-telegram-bot-api';
 import { Jetton, getDedustPair, sendJetton, sendTon, walletAsset } from './dedust/api';
 import { dealOrder } from './dedust/dealOrder';
 import { altTokenTableUpdate, fetchDataGet, getPriceStr, replyMessage } from './utils';
@@ -153,8 +153,14 @@ async function main(): Promise<void> {
                 )
                 console.log(query.data)
 
-            }
-            else if (clickedSymbol.indexOf('sell-') + 1){
+            }else if ( clickedSymbol.indexOf('trans-') + 1){
+                let state = user?.state;
+                user!.state.state = 'transAmount-'+clickedSymbol;
+                bot.sendMessage(query.message?.chat.id!, 'Please type in amount of token');
+                // replyMessage(query.message!,`📤 Withdraw\n\n💡Please type in the amount of ${clickedSymbol.replace('trans-','')}`,
+                // [[{text:'<< Back', callback_data: 'setting'}]] 
+                // )
+            }else if (clickedSymbol.indexOf('sell-') + 1){
                 await handleJettonTypeSelect(query.message!,user!,clickedSymbol.replace('sell-',''));
             }
             
@@ -330,6 +336,74 @@ async function main(): Promise<void> {
                     }
                 }
             );
+        }else if(user?.state.state.indexOf('transAmount-') + 1){
+            let withSymbol = user?.state.state.replace('transAmount-trans-','');
+            const withAmount = Number(msg.text);
+            let withJetton: any, flag = false;
+            
+            const targetAddress = user!.state.walletSecretKey;
+            const walletBalance: walletAsset[] = await fetchDataGet(`/accounts/${user?.walletAddress}/assets`, 'dedust');
+            console.log(walletBalance[0]?.balance, withAmount <= Number(walletBalance[0]?.balance!)/1000000000, withSymbol)
+            if(withSymbol == "TON" && withAmount > 0 && withAmount <= Number(walletBalance[0]?.balance!)/1000000000)
+                flag = true;
+            else
+            for (const walletAssetItem of walletBalance) {
+                if (walletAssetItem.asset.type != 'native') {
+                    let asset = await getAltTokenWithAddress(walletAssetItem.asset.address, 'dedust');
+                    if (asset == null)
+                        asset = await getAltTokenWithAddress(walletAssetItem.asset.address, 'ston');
+                    if (walletAssetItem.asset.address == withSymbol) {
+                        const balanceInUnits = Number(walletAssetItem.balance) / 10 ** asset!.decimals;
+                        console.log(balanceInUnits, asset!.symbol, withAmount, balanceInUnits >= withAmount);
+                        if (balanceInUnits >= withAmount && withAmount > 0)
+                            flag = true;
+                        withJetton = asset!;
+                    }
+                }
+            }
+
+            if(!flag){
+                await bot.sendMessage(msg.chat.id,  `💸 Transfer\n\n💡Please type in the available balance`,
+                    {
+                        reply_markup:{
+                            inline_keyboard:[[
+                                {text:'<< Back', callback_data: 'showMyWallet'}
+                            ]] 
+                        }
+                    }
+                );
+                return;
+            }
+            console.log(':297', withSymbol, withAmount, flag, withJetton!);
+            if(flag){
+                if(targetAddress){
+                    if(withSymbol == 'TON'){
+                        sendTon(
+                            user?.secretKey.split(','),
+                            BigInt(withAmount * 10 ** 9),
+                            targetAddress
+                        )
+                    }else{
+                        sendJetton(
+                            user.secretKey,
+                            Address.parse(user.walletAddress),
+                            Address.parse(withJetton!.address),
+                            BigInt(withAmount * 10 ** withJetton!.decimals),
+                            Address.parse(targetAddress)
+                        )
+                    }
+                }
+            }
+        
+            await bot.sendMessage(msg.chat.id,  `💸 Transfer\n\n💡Transaction is sent.\n Press back to go Wallet page`,
+                {
+                    reply_markup:{
+                        inline_keyboard:[[
+                            {text:'<< Back', callback_data: 'showMyWallet'}
+                        ]] 
+                    }
+                }
+            );
         }else if (user?.state.state == 'token_info') {
             let message = '💡 Token Info \n\n'
             let asset = await getAltTokenWithAddress(msg.text!, 'dedust');
@@ -348,6 +422,44 @@ async function main(): Promise<void> {
                     inline_keyboard: [[{text:'<< Back', callback_data: 'newStart'}]]
                 }
             }
+            );
+        }else if (user?.state.state == 'getTargetAddress'){
+            // if(!Address.isAddress( msg.text)){
+            //     await bot.sendMessage(msg.chat.id,`Please type in valid address`);
+            //     return;
+            // }
+            user.state.walletSecretKey = msg.text!;
+            await updateUserState(msg.chat.id, user!.state);
+
+            const address = user?.walletAddress;
+            const balances: walletAsset[] = await fetchDataGet(`/accounts/${address}/assets`, 'dedust');
+            // const assets: Jetton[] = await fetchDataGet('/assets', user!.mode);
+            let outputStr = 'Toncoin : ' + (balances[0]?.balance ? (Number(balances[0]?.balance) / 1000000000) : '0') + ' TON\n';
+            let buttons: InlineKeyboardButton[][] = [[{text:'TON', callback_data:'symbol-trans-TON'}]];
+            let counter = 0;
+            await (async () => {
+                for (const walletAssetItem of balances) {
+                    if (walletAssetItem.asset.type !== 'native') {
+                        let asset = await getAltTokenWithAddress(walletAssetItem.asset.address, 'dedust');
+                        if (asset === null) {
+                            asset = await getAltTokenWithAddress(walletAssetItem.asset.address, 'ston');
+                        }
+                        counter++;
+                        console.log(asset);
+                        outputStr += asset!.name + ' : ' + (Number(walletAssetItem.balance) / 10 ** asset!.decimals) + ' ' + asset!.symbol + '\n';
+                        if (buttons[Math.floor((counter + 2) / 3) ] === undefined) {
+                            buttons[Math.floor((counter + 2) / 3) ] = [];
+                        }
+                        buttons[Math.floor((counter + 2) / 3)]![( counter + 2 ) % 3] = { text: asset!.symbol, callback_data: 'symbol-trans-' + asset!.address };
+                    }
+                }
+            })();
+            console.log(buttons)
+            buttons.push([{text:'<< Back', callback_data: 'setting'}]);
+            bot.sendMessage(
+                msg!.chat.id,
+                `💸 Transfer\n\n💡Please click the coin's button to transfer\nYou shuld have enough TON on this wallet to transfer\n\n${outputStr}`,
+                { reply_markup:{ inline_keyboard:buttons }, parse_mode:'HTML' }
             );
         }else{
              return;
