@@ -11,6 +11,7 @@ export interface OrderingData {
     price: number; // toJetton x amount = $fromJetton
     isBuy: boolean;
     dex: string;
+    mode: string
     walletSecretKey: string;
 }
 
@@ -68,6 +69,7 @@ const orderingDataSchema = new Schema<OrderingData>({
     state: String,
     dex: String,
     walletSecretKey: String,
+    mode: String
 });
 
 const altTokenSchema = new Schema<AltToken>({

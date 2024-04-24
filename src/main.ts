@@ -23,18 +23,11 @@ import {
 } from './commands-handlers';
 import { initRedisClient } from './ton-connect/storage';
 import {
-    AltToken,
-    Pool,
     connect,
     deleteOrderingDataFromUser,
-    deletePoolsCollection,
-    deleteWalletSecret,
     getAltTokenWithAddress,
-    getAltTokenWithSymbol,
-    getAltTokens,
-    getPoolWithCaption,
-    getPools,
     getUserByTelegramID,
+    updateUserMode,
     updateUserState
 } from './ton-connect/mongo';
 import { commandCallback } from './commands-handlers';
@@ -47,7 +40,6 @@ import { CHAIN, toUserFriendlyAddress } from '@tonconnect/sdk';
 let exec = require('child_process').exec;
 
 import { Address } from '@ton/core';
-import mongoose from 'mongoose';
 import { getStonPair } from './ston-fi/api';
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
@@ -128,6 +120,7 @@ async function main(): Promise<void> {
 
             //check user state is trade
             if (clickedSymbol === 'selectdex') {
+                await updateUserMode(query.message?.chat.id!, 'book');
                 await replyMessage(query.message!, `🏃 Trading\n\nWhich DEX will you use?`, [[
                         {
                             text: '🟢Ston.fi',
@@ -138,6 +131,22 @@ async function main(): Promise<void> {
                             callback_data: JSON.stringify({ method: 'selectPair', data: 'dedust' })
                         },
                     {text: '📕Active Orders', callback_data: 'orderingBook' }
+                    ],[
+                        { text: '<< Back', callback_data: 'newStart' }
+                    ]
+                ]);
+            // eslint-disable-next-line eqeqeq
+            }else if (clickedSymbol === 'selectdex-swap') {
+                await updateUserMode(query.message?.chat.id!, 'swap');
+                await replyMessage(query.message!, `♻️ Instant Swap\n\nWhich DEX will you use?`, [[
+                        {
+                            text: '🟢Ston.fi',
+                            callback_data: JSON.stringify({ method: 'selectPair', data: 'ston' })
+                        },
+                        {
+                            text: '🟣Dedust.io',
+                            callback_data: JSON.stringify({ method: 'selectPair', data: 'dedust' })
+                        }
                     ],[
                         { text: '<< Back', callback_data: 'newStart' }
                     ]
@@ -170,8 +179,20 @@ async function main(): Promise<void> {
             if(user!.state.state == 'ordermanage'){
                 console.log(query.data)
                 console.log(user?.state.state)
-                await deleteOrderingDataFromUser(query.message?.chat.id!,mongoose.Types.ObjectId.createFromHexString( query.data.replace('orderclick-','')))
-                await handleOrderingBookCommand(query);
+                await replyMessage(query.message!,`📕 Ordering Book\n\nAre you sure if you want to remove your order?`,
+                    [
+                        [
+                            {text:'🟢Yes', callback_data: JSON.stringify({method: 'deleteOrder', data: query.data.replace('orderclick-','')})},
+                            {text:'🔴No', callback_data: 'orderingBook'},
+                        ],
+                        [
+                            {text:'<< Back', callback_data: 'orderingBook'},
+                        ]
+                    ]
+                )
+                
+                //await deleteOrderingDataFromUser(query.message?.chat.id!,mongoose.Types.ObjectId.createFromHexString( query.data.replace('orderclick-','')))
+                //await handleOrderingBookCommand(query);
             }
         }
         
@@ -197,7 +218,7 @@ async function main(): Promise<void> {
             return;
         let user = await getUserByTelegramID(msg.chat!.id);
         if (!!!user) return;
-        // let assets: Jetton[] = await fetchDataGet('/assets', user!.mode);
+        // let assets: Jetton[] = await fetchDataGet('/assets', user!.state.state);
 
         if (user!.state.state === 'trading') {
             user!.state.state = 'selectPair';
@@ -227,7 +248,7 @@ async function main(): Promise<void> {
             user.state.price = Number(msg.text);
             console.log(user.state.price);
             user.state.state = 'amount';
-            const strPrice = await getPriceStr(user.state.jettons, user.state.mainCoin, user!.mode);
+            //const strPrice = await getPriceStr(user.state.jettons, user.state.mainCoin, user!.state.state);
             if(user.state.price > 0){
                 const outputAmountStr = user.state.amount.toFixed(9)// + user.state.isBuy ? user.state.jettons[user.state.mainCoin] : user.state.jettons[ 1- user.state.mainCoin];
                 await bot.sendMessage(msg.chat.id,
@@ -433,7 +454,7 @@ async function main(): Promise<void> {
 
             const address = user?.walletAddress;
             const balances: walletAsset[] = await fetchDataGet(`/accounts/${address}/assets`, 'dedust');
-            // const assets: Jetton[] = await fetchDataGet('/assets', user!.mode);
+            // const assets: Jetton[] = await fetchDataGet('/assets', user!.state.state);
             let outputStr = 'Toncoin : ' + (balances[0]?.balance ? (Number(balances[0]?.balance) / 1000000000) : '0') + ' TON\n';
             let buttons: InlineKeyboardButton[][] = [[{text:'TON', callback_data:'symbol-trans-TON'}]];
             let counter = 0;

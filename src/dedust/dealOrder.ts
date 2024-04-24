@@ -61,7 +61,7 @@ export async function dealOrder() {
                             order.price *
                                 10 ** pool!.decimals[mainCoinId]! *
                                 (order.isBuy ? 1 : -1) &&
-                        Number(pricePost) !== 0
+                        Number(pricePost) !== 0 || order.mode == 'swap'
                     ) {
                         if (order.dex === 'dedust') {
                             if (fromJetton === 'TON') {
@@ -84,10 +84,7 @@ export async function dealOrder() {
                                     amount
                                 );
                             }
-                            bot.sendMessage(
-                                user.telegramID,
-                                'TX realised, Visit https://tonviewer.com/' + wallet.address.toString()
-                            );
+
                         } else if (order.dex === 'ston') {
                             await swapJetton(
                                 wallet.address.toString(),
@@ -96,12 +93,13 @@ export async function dealOrder() {
                                 amount,
                                 mnemonic
                             );
-                            bot.sendMessage(
-                                user.telegramID,
-                                'TX realised, Visit https://tonviewer.com/' + wallet.address.toString()
-                            );
+
                         }
-                         deleteOrderingDataFromUser(user.telegramID, order!._id);
+                        await deleteOrderingDataFromUser(user.telegramID, order!._id);
+                        await bot.sendMessage(
+                            user.telegramID,
+                            'TX realised, Visit https://tonviewer.com/' + wallet.address.toString()
+                        );
                     }
                 } catch (error) {
                     console.log(error);

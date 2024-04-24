@@ -281,6 +281,7 @@ export async function getDedustPair() {
     await Promise.all(
         // eslint-disable-next-line prettier/prettier
         pools.map(async (pool) => {
+            pool.type = 'dedust';
             const dbPool = await getPoolByddress(pool.address);
             if(dbPool == null){
                 //////// NEW POOL FOUND ///////

@@ -224,7 +224,7 @@ export async function getPriceStr(jettons: string[], mainId: number, dex: string
     const pool = await getPoolWithCaption(jettons, dex);
     addresses = pool?.assets!;
     decimals = pool?.decimals!;
-    console.log('decimals', decimals, pool, jettons)
+    console.log('decimals', decimals, pool, jettons, dex)
 
     if (decimals[1 - mainId] === 0) {
         let metadata = await getAltTokenWithAddress(addresses[1 - mainId]!, 'dedust');
