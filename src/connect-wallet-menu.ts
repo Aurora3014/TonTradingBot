@@ -1,35 +1,55 @@
-import TelegramBot, { CallbackQuery } from 'node-telegram-bot-api';
+import TelegramBot, { CallbackQuery, InlineKeyboardButton } from 'node-telegram-bot-api';
 import { getWalletInfo, getWallets } from './ton-connect/wallets';
 import { bot } from './bot';
 import { getConnector } from './ton-connect/connector';
 import QRCode from 'qrcode';
 import * as fs from 'fs';
 import { isTelegramUrl } from '@tonconnect/sdk';
-import { addTGReturnStrategy, buildUniversalKeyboard } from './utils';
+import { AT_WALLET_APP_NAME, addTGReturnStrategy, buildUniversalKeyboard, convertDeeplinkToUniversalLink } from './utils';
 
 export const walletMenuCallbacks = {
     chose_wallet: onChooseWalletClick,
     select_wallet: onWalletClick,
-    universal_qr: onOpenUniversalQRClick
+    universal_qr: onOpenUniversalQRClick,
+    send_qr: sendQRPhoto
 };
+
+async function sendQRPhoto(query:CallbackQuery, _: string){
+    const wallets = await getWallets();
+    const connector = getConnector(query.message?.chat.id!);
+
+    const link = connector.connect(wallets);
+    const image = await QRCode.toBuffer(link);
+    await bot.sendPhoto(query.message?.chat.id!, image);
+}
 async function onChooseWalletClick(query: CallbackQuery, _: string): Promise<void> {
     const wallets = await getWallets();
+    const connector = getConnector(query.message?.chat.id!);
+
+    const link = connector.connect(wallets);
+    const atWallet = wallets.find(wallet => wallet.appName.toLowerCase() === AT_WALLET_APP_NAME);
+    const atWalletLink = atWallet
+        ? addTGReturnStrategy(
+              convertDeeplinkToUniversalLink(link, atWallet?.universalLink),
+              process.env.TELEGRAM_BOT_LINK!
+          )
+        : undefined;
+        
+    let buttons: InlineKeyboardButton[][] = [[{text: "@wallet", url: atWalletLink}]];
+    let counter = 0;
+    for (const wallet of wallets) {
+        counter++;
+        console.log(wallet);
+        if (buttons[Math.floor((counter) / 3) ] === undefined) {
+            buttons[Math.floor((counter) / 3) ] = [];
+        }
+        buttons[Math.floor((counter) / 3)]![( counter ) % 3] = { text: wallet.name, callback_data: JSON.stringify({ method: 'select_wallet', data: wallet.appName })};
+    }
+    console.log(buttons)
+    buttons.push( [{ text: '« Back', callback_data: JSON.stringify({ method: 'universal_qr' }) }] );
     await bot.editMessageReplyMarkup(
         {
-            inline_keyboard: [
-                wallets.map(wallet => ({
-                    text: wallet.name,
-                    callback_data: JSON.stringify({ method: 'select_wallet', data: wallet.appName })
-                })),
-                [
-                    {
-                        text: '« Back',
-                        callback_data: JSON.stringify({
-                            method: 'universal_qr'
-                        })
-                    }
-                ]
-            ]
+            inline_keyboard: buttons
         },
         {
             message_id: query.message?.message_id,
@@ -37,6 +57,7 @@ async function onChooseWalletClick(query: CallbackQuery, _: string): Promise<voi
         }
     );
 }
+
 
 async function onOpenUniversalQRClick(query: CallbackQuery, _: string): Promise<void> {
     const chatId = query.message!.chat.id;
@@ -46,13 +67,22 @@ async function onOpenUniversalQRClick(query: CallbackQuery, _: string): Promise<
 
     const link = connector.connect(wallets);
 
-    await editQR(query.message!, link);
-
-    const keyboard = await buildUniversalKeyboard(link, wallets);
+    //await editQR(query.message!, link);
+     const keyboard = await buildUniversalKeyboard();
+    // await bot.editMessageText(
+    //     '🔗 Wallet Connect\n\n                                 ',
+    //     {
+    //         message_id: query.message?.message_id,
+    //         chat_id: query.message?.chat.id
+    //     }
+    // )
 
     await bot.editMessageReplyMarkup(
         {
-            inline_keyboard: [keyboard]
+            inline_keyboard: [
+                keyboard,
+                [{text:'<< Back', callback_data: 'newStart'}]
+            ]
         },
         {
             message_id: query.message?.message_id,
@@ -81,8 +111,14 @@ async function onWalletClick(query: CallbackQuery, data: string): Promise<void> 
         qrLink = addTGReturnStrategy(qrLink, 'none');
     }
 
-    await editQR(query.message!, qrLink);
-    
+    //await editQR(query.message!, qrLink);
+    // await bot.editMessageText(
+    //     '🔗 Wallet Connect\n\n                                 ',
+    //     {
+    //         message_id: query.message?.message_id,
+    //         chat_id: query.message?.chat.id
+    //     }
+    // )
     await bot.editMessageReplyMarkup(
         {
             inline_keyboard: [

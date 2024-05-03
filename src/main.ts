@@ -107,7 +107,9 @@ async function main(): Promise<void> {
             case 'token_info':
                 handleTokenInfo(query);
                 return;
-           
+            case 'sendBuyAmuontAlert':
+                bot.sendMessage(query.message?.chat.id!, 'Please type in amount Jetton in TON!');
+                return;
             default:
                 break;
         }

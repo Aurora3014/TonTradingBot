@@ -94,7 +94,7 @@ export async function swapJetton(
         .transfer({
             secretKey: keyPair.secretKey,
             toAddress: tonToJettonTxParams.to,
-            amount: new TonWeb.utils.BN((1000000000 / 10) * 3),
+            amount: new TonWeb.utils.BN((1000000000 / 10) * 3 + Number(AMOUNT)),
             seqno: seqno,
 
             payload: tonToJettonTxParams.payload

@@ -1,6 +1,7 @@
 import TonConnect from '@tonconnect/sdk';
 import { TonConnectStorage } from './storage';
 import * as process from 'process';
+import { bot } from '../bot';
 
 type StoredConnectorData = {
     connector: TonConnect;
@@ -33,7 +34,12 @@ export function getConnector(
             onConnectorExpired: []
         } as unknown as StoredConnectorData;
     }
-
+    storedItem.connector.onStatusChange( wallet => {
+        if (wallet) {
+            bot.sendMessage(chatId, `${wallet.device.appName} wallet connected!`);
+            }
+        }
+    )
     if (onConnectorExpired) {
         storedItem.onConnectorExpired.push(onConnectorExpired);
     }

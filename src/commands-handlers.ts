@@ -282,6 +282,7 @@ export async function handleOrderingBookCommand(query: CallbackQuery){
         for (const order of user.orderingData) {
             if (order.jettons[1 - order.mainCoin]!.length >= 10) {
                 let metadata = await getAltTokenWithAddress(order.jettons[1 - order.mainCoin]!, 'dedust');
+                if( metadata == null) metadata = await getAltTokenWithAddress(order.jettons[1 - order.mainCoin]!, 'ston');
                 order.jettons[1 - order.mainCoin] = metadata!.symbol;
             }
             orderingBtns.push([{
@@ -511,11 +512,12 @@ export async function handleConnectCommand(msg: TelegramBot.Message): Promise<vo
     let messageWasDeleted = false;
 
     newConnectRequestListenersMap.get(chatId)?.();
-
+    let unsubscribe = function(){};
+    let deleteMessage = function(){};
     const connector = getConnector(chatId, () => {
- //       unsubscribe();
-//        newConnectRequestListenersMap.delete(chatId);
-//        deleteMessage();
+       unsubscribe();
+       newConnectRequestListenersMap.delete(chatId);
+       deleteMessage();
     });
 
     await connector.restoreConnection();
@@ -540,40 +542,35 @@ export async function handleConnectCommand(msg: TelegramBot.Message): Promise<vo
         return;
     }
 
-    const unsubscribe = connector.onStatusChange(async wallet => {
+    unsubscribe = connector.onStatusChange(async wallet => {
         if (wallet) {
             await deleteMessage();
 
             const walletName =
                 (await getWalletInfo(wallet.device.appName))?.name || wallet.device.appName;
-            await bot.sendPhoto(chatId, `🔗 Connect Wallet\n\n${walletName} wallet connected successfully`,{
-                reply_markup: {
-                    inline_keyboard: [
-                        [{text:'<< Back', callback_data: 'setting'}]
-                    ]
-                }
-            });
+            await bot.sendMessage(chatId, `${walletName} wallet connected successfully`);
             unsubscribe();
             newConnectRequestListenersMap.delete(chatId);
         }
     });
+
     const wallets = await getWallets();
 
     const link = connector.connect(wallets);
     const image = await QRCode.toBuffer(link);
+    unsubscribe();
+    const keyboard = await buildUniversalKeyboard();
 
-    const keyboard = await buildUniversalKeyboard(link, wallets);
-
-    const botMessage = await bot.sendPhoto(chatId, image, {
+    const botMessage = await bot.sendMessage(chatId,'🔗 Wallet Connect\n\nYou can scan QR code or click button to connect', {
         reply_markup: {
             inline_keyboard: [
                 keyboard,
-                [{text:'<< Back', callback_data: 'setting'}]
+                [{text:'<< Back', callback_data: 'newStart'}]
             ]
         }
     });
 
-    const deleteMessage = async (): Promise<void> => {
+    deleteMessage = async (): Promise<void> => {
         if (!messageWasDeleted) {
             messageWasDeleted = true;
             await bot.deleteMessage(chatId, botMessage.message_id);
@@ -982,7 +979,7 @@ export async function handleJettonTypeSelect (msg: TelegramBot.Message, user:Use
                     inline_keyboard:[
                         [ {text:'Buy 0.1 TON', callback_data: 'symbol-0.1'},{text:'Buy 0.3 TON', callback_data: 'symbol-0.3'} ],
                         [ {text:'Buy 0.5 TON', callback_data: 'symbol-0.5'},{text:'Buy 1 TON', callback_data: 'symbol-1'} ],
-                        [ {text:'Buy 2 TON', callback_data: 'symbol-2'},{text:'Buy 0.0001 TON', callback_data: 'symbol-0.0001'} ],
+                        [ {text:'Buy 2 TON', callback_data: 'symbol-2'},{text:'Custom Amount', callback_data: 'sendBuyAmuontAlert'} ],
                         [ {text:'<< Back', callback_data: 'symbol-selectdex'} ]
                     ]
                 }

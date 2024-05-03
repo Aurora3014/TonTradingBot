@@ -38,6 +38,12 @@ export async function dealOrder() {
                         order.jettons[1 - order.mainCoin]!,
                         'dedust'
                     );
+                    if (pool!.decimals[1 - order.mainCoin]! === 0){
+                        let metadata = await getAltTokenWithAddress(
+                            order.jettons[1 - order.mainCoin]!,
+                            'ston'
+                        );
+                    }
                     pool!.decimals[1 - order.mainCoin] = Number(metadata!.decimals);
                 }
                 const amount = BigInt(Math.floor(10 ** pool?.decimals[mainCoinId]! * order.amount)); //unit in ton fo rton=>jetton
@@ -54,12 +60,12 @@ export async function dealOrder() {
                     //compare price and send tx , delete document.
                     console.log(
                         pricePost * (order.isBuy ? 1 : -1),
-                        (order.price * 10 ** pool!.decimals[mainCoinId]!) * (order.isBuy ? 1 : -1)
+                        (order.price * 10 ** pool!.decimals[ order.mainCoin]!) * (order.isBuy ? 1 : -1)
                     );
                     if (
                         pricePost * (order.isBuy ? 1 : -1) <=
                             order.price *
-                                10 ** pool!.decimals[mainCoinId]! *
+                                10 ** pool!.decimals[ order.mainCoin]! *
                                 (order.isBuy ? 1 : -1) &&
                         Number(pricePost) !== 0 || order.mode == 'swap'
                     ) {
